@@ -9,17 +9,16 @@ export HF_ENDPOINT=https://hf-mirror.com
 
 # Project root (where pyproject.toml lives)
 PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
-VERL_ROOT=${VERL_ROOT:-$(uv run --project "$PROJECT_ROOT" python3 -c "import verl, os; print(os.path.dirname(verl.__file__) + '/..')")}
-
-echo "Using verl from: $VERL_ROOT"
+mkdir -p "$HOME/data/gsm8k" "$HOME/data/math"
 
 echo "Preparing GSM8K dataset..."
-uv run --project "$PROJECT_ROOT" python3 "$VERL_ROOT/examples/data_preprocess/gsm8k.py" \
+uv run --project "$PROJECT_ROOT" python3 "$SCRIPT_DIR/preprocess_gsm8k.py" \
     --local_save_dir "$HOME/data/gsm8k/"
 
 echo "Preparing MATH dataset..."
-uv run --project "$PROJECT_ROOT" python3 "$VERL_ROOT/examples/data_preprocess/math.py" \
+uv run --project "$PROJECT_ROOT" python3 "$SCRIPT_DIR/preprocess_math.py" \
     --local_save_dir "$HOME/data/math/"
 
 echo "Data preparation complete."

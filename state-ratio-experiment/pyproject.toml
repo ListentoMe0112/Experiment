@@ -13,3 +13,17 @@ dependencies = [
 test = [
     "pytest",
 ]
+
+# Use Chinese mirrors for faster package downloads
+[[tool.uv.index]]
+url = "https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple"
+name = "tuna"
+default = true
+
+[[tool.uv.index]]
+url = "https://download.pytorch.org/whl/cu124"
+name = "pytorch-cu124"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cu124" }
