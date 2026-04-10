@@ -5,27 +5,27 @@ description = "State-Corrected GRPO: Recovering the state distribution ratio via
 requires-python = ">=3.10,<3.11"
 dependencies = [
     # ---------------------------------------------------------------
-    # Versions aligned with Docker image:
-    #   verlai/verl:base-verl0.6-cu128-cudnn9.8-torch2.8.0-fa2.7.4
-    # All deps managed by uv — no Docker required.
+    # Versions downgraded to be compatible with:
+    #   NVIDIA Driver 535  →  max CUDA runtime 12.2
+    #   Using PyTorch cu121 builds (CUDA 12.1 compat with Driver 535)
     # ---------------------------------------------------------------
 
-    # Core framework
-    "torch==2.8.0",
-    "verl==0.6.1",
+    # Core framework  (cu121 wheel resolved via [tool.uv.index])
+    "torch==2.5.1",
+    "verl==0.3.1",
 
-    # vllm 0.10.2 is the first stable release that requires torch==2.8.0
-    "vllm==0.10.2",
+    # vllm 0.6.6.post1 is the last stable release for torch 2.5.x
+    "vllm==0.6.6.post1",
 
-    # vllm 0.10.2 requires transformers>=4.55.2
-    "transformers>=4.55.2",
+    # transformers compatible with verl 0.3.x
+    "transformers==4.48.2",
 
     # flash-attn: source-only build, needs torch at build time (see [tool.uv])
     "flash-attn==2.7.4.post1",
 
-    # verl 0.6.1 constraints
+    # verl 0.3.x constraints
     "numpy<2.0.0",
-    "tensordict>=0.8.0,<=0.10.0,!=0.9.0",
+    "tensordict>=0.6.0,<0.8.0",
     "datasets",
 ]
 
@@ -37,9 +37,14 @@ test = [
 # flash-attn's setup.py imports torch but doesn't declare it as a build dep;
 # tell uv to make torch available during the build.
 [tool.uv]
-extra-build-dependencies = { flash-attn = ["torch==2.8.0"] }
+extra-build-dependencies = { flash-attn = ["torch==2.5.1"] }
 
 [[tool.uv.index]]
 url = "https://mirrors.cloud.tencent.com/pypi/simple"
 name = "tencent"
 default = true
+
+# PyTorch cu121 wheel index
+[[tool.uv.index]]
+url = "https://download.pytorch.org/whl/cu121"
+name = "pytorch-cu121"
