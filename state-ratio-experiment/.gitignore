@@ -1,0 +1,19 @@
+# uv / Python
+.venv/
+uv.lock
+__pycache__/
+*.pyc
+*.egg-info/
+
+# Data artifacts
+*.parquet
+data/
+
+# Checkpoints
+checkpoints/
+
+# Wandb
+wandb/
+
+# OS
+.DS_Store
