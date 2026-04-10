@@ -39,7 +39,7 @@ test = [
 [tool.uv]
 # Only resolve for Linux (verl / vllm / flash-attn have no macOS wheels)
 environments = ["sys_platform == 'linux'"]
-extra-build-dependencies = { flash-attn = ["torch==2.5.1"] }
+extra-build-dependencies = { flash-attn = ["torch==2.5.1", "packaging"] }
 
 [[tool.uv.index]]
 url = "https://mirrors.cloud.tencent.com/pypi/simple"
