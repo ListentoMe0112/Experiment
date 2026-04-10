@@ -39,7 +39,7 @@ NNODES=1
 # Training
 train_batch_size=512
 ppo_mini_batch_size=128
-ppo_micro_batch_size_per_gpu=8
+ppo_micro_batch_size_per_gpu=4
 max_prompt_length=1024
 max_response_length=2048
 n_resp_per_prompt=8
@@ -49,7 +49,7 @@ lr=1e-6
 
 # Rollout
 rollout_tp=2
-gpu_memory_utilization=0.6
+gpu_memory_utilization=0.4
 temperature=1.0
 top_p=1.0
 
