@@ -60,7 +60,7 @@ uv run --project "$PROJECT_ROOT" python3 -m verl.trainer.main_ppo \
     data.filter_overlong_prompts=True \
     data.truncation='error' \
     actor_rollout_ref.model.path=$MODEL_PATH \
-    +actor_rollout_ref.model.override_config.attn_implementation=sdpa \
+    +actor_rollout_ref.model.override_config.attn_implementation=flash_attention_2 \
     actor_rollout_ref.actor.optim.lr=$lr \
     actor_rollout_ref.actor.optim.lr_warmup_steps_ratio=0.05 \
     actor_rollout_ref.model.use_remove_padding=True \
@@ -83,6 +83,8 @@ uv run --project "$PROJECT_ROOT" python3 -m verl.trainer.main_ppo \
     actor_rollout_ref.rollout.tensor_model_parallel_size=$rollout_tp \
     actor_rollout_ref.rollout.name=vllm \
     actor_rollout_ref.rollout.gpu_memory_utilization=$gpu_memory_utilization \
+    actor_rollout_ref.rollout.enforce_eager=False \
+    actor_rollout_ref.rollout.free_cache_engine=True \
     actor_rollout_ref.rollout.n=$n_resp_per_prompt \
     actor_rollout_ref.rollout.temperature=$temperature \
     actor_rollout_ref.rollout.top_p=$top_p \
