@@ -4,8 +4,9 @@ version = "0.1.0"
 description = "State-Corrected GRPO: Recovering the state distribution ratio via deterministic transitions"
 requires-python = ">=3.10"
 dependencies = [
-    "verl",
-    "torch",
+    "verl==0.7.1",
+    "torch==2.9.1",
+    "transformers==4.52.4",
     "datasets",
 ]
 
@@ -15,6 +16,8 @@ test = [
 ]
 
 # Use Chinese mirrors for faster package downloads
+# Note: PyTorch 2.9.1 on PyPI already bundles CUDA 12.8 (nvidia-cu12 deps),
+# so no need for a separate pytorch.org index.
 [[tool.uv.index]]
 url = "https://mirrors.cloud.tencent.com/pypi/simple"
 name = "tencent"
