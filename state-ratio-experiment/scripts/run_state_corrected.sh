@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # =============================================================================
 # Experiment 3: State-Corrected GRPO (truncated prefix IS correction)
-# Model: Qwen2.5-1.5B-Instruct | 2× H100 80GB | Docker: verlai/verl:vllm018.dev1
+# Model: Qwen2.5-7B-Instruct | 2× H100 80GB | Docker: verlai/verl:vllm018.dev1
 #
 # This is the novel method from "Outlook: Recovering the State Ratio via
 # Deterministic Transitions". It adds a truncated prefix product of per-token
@@ -25,7 +25,7 @@ train_files="['$gsm8k_train_path', '$math_train_path']"
 test_files="['$gsm8k_test_path', '$math_test_path']"
 
 # ========================= Shared Hyperparameters ============================
-MODEL_PATH=${MODEL_PATH:-$HOME/models/Qwen2.5-1.5B-Instruct}
+MODEL_PATH=${MODEL_PATH:-$HOME/models/Qwen2.5-7B-Instruct}
 GPUS_PER_NODE=2
 NNODES=1
 
@@ -105,7 +105,7 @@ python3 -m verl.trainer.main_ppo \
     trainer.critic_warmup=0 \
     trainer.logger='["console"]' \
     trainer.project_name='state_ratio_experiment' \
-    trainer.experiment_name="sc_grpo_k${LOOKBACK_K}_qwen2.5_1.5b" \
+    trainer.experiment_name="sc_grpo_k${LOOKBACK_K}_qwen2.5_7b" \
     trainer.n_gpus_per_node=$GPUS_PER_NODE \
     trainer.nnodes=$NNODES \
     trainer.val_before_train=True \
