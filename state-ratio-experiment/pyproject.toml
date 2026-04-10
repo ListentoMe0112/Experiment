@@ -17,7 +17,7 @@ test = [
 ]
 
 # Use Chinese mirrors for faster package downloads
-# Note: PyTorch 2.9.1 on PyPI already bundles CUDA 12.8 (nvidia-cu12 deps),
+# Note: PyTorch 2.7.0 on PyPI bundles CUDA 12.6 (nvidia-cu12 deps),
 # so no need for a separate pytorch.org index.
 [[tool.uv.index]]
 url = "https://mirrors.cloud.tencent.com/pypi/simple"

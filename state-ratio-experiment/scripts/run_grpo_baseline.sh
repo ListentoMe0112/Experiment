@@ -7,7 +7,8 @@ set -xeuo pipefail
 
 # Use HuggingFace mirror for mainland China
 export HF_ENDPOINT=https://hf-mirror.com
-export VLLM_USE_V1=1
+# vLLM 0.9.2 V1 engine may crash in verl's async server mode; use V0 for now
+export VLLM_USE_V1=0
 
 # Project root (where pyproject.toml lives)
 PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
