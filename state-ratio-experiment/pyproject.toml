@@ -23,6 +23,10 @@ test = [
 # Use Chinese mirrors for faster package downloads
 # Note: PyTorch 2.7.0 on PyPI bundles CUDA 12.6 (nvidia-cu12 deps),
 # so no need for a separate pytorch.org index.
+# flash-attn's setup.py imports torch but doesn't declare it as a build dep
+[tool.uv]
+extra-build-dependencies = { flash-attn = ["torch"] }
+
 [[tool.uv.index]]
 url = "https://mirrors.cloud.tencent.com/pypi/simple"
 name = "tencent"
