@@ -2,26 +2,26 @@
 name = "state-ratio-experiment"
 version = "0.1.0"
 description = "State-Corrected GRPO: Recovering the state distribution ratio via deterministic transitions"
-requires-python = ">=3.10,<3.11"
+requires-python = ">=3.10,<3.13"
 dependencies = [
     # ---------------------------------------------------------------
-    # Versions downgraded to be compatible with:
-    #   NVIDIA Driver 535  →  max CUDA runtime 12.2
-    #   Using PyTorch cu121 builds (CUDA 12.1 compat with Driver 535)
+    # Versions selected for:
+    #   Docker CUDA 12.8 + 2× H100 80GB
+    #   PyTorch cu124 builds (CUDA 12.4 compat, forward-compatible with 12.8)
     # ---------------------------------------------------------------
 
-    # Core framework  (cu121 wheel resolved via [tool.uv.index])
-    "torch==2.5.1",
+    # Core framework  (cu124 wheel resolved via [tool.uv.index])
+    "torch==2.6.0",
     "verl==0.5.0",
 
-    # vllm 0.6.6.post1 is the last stable release for torch 2.5.x
-    "vllm==0.6.6.post1",
+    # vllm 0.7.3 is compatible with torch 2.6.0
+    "vllm==0.7.3",
 
-    # transformers compatible with verl 0.5.0
-    "transformers==4.48.2",
+    # transformers compatible with verl 0.5.0 + vllm 0.7.3
+    "transformers>=4.48.0,<4.50.0",
 
     # flash-attn: source-only build, needs torch at build time (see [tool.uv])
-    "flash-attn==2.7.4.post1",
+    "flash-attn>=2.7.0",
 
     # verl 0.5.0 constraints
     "numpy<2.0.0",
@@ -39,14 +39,14 @@ test = [
 [tool.uv]
 # Only resolve for Linux (verl / vllm / flash-attn have no macOS wheels)
 environments = ["sys_platform == 'linux'"]
-extra-build-dependencies = { flash-attn = ["torch==2.5.1", "packaging"] }
+extra-build-dependencies = { flash-attn = ["torch==2.6.0", "packaging", "wheel"] }
 
 [[tool.uv.index]]
 url = "https://mirrors.cloud.tencent.com/pypi/simple"
 name = "tencent"
 default = true
 
-# PyTorch cu121 wheel index
+# PyTorch cu124 wheel index (CUDA 12.4, forward-compatible with CUDA 12.8)
 [[tool.uv.index]]
-url = "https://download.pytorch.org/whl/cu121"
-name = "pytorch-cu121"
+url = "https://download.pytorch.org/whl/cu124"
+name = "pytorch-cu124"

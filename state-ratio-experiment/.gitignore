@@ -1,9 +1,8 @@
-# uv / Python
-.venv/
-uv.lock
+# Python
 __pycache__/
 *.pyc
 *.egg-info/
+.venv/
 
 # Data artifacts
 *.parquet
@@ -17,3 +16,6 @@ wandb/
 
 # OS
 .DS_Store
+
+# Legacy (no longer used)
+uv.lock

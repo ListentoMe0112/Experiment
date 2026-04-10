@@ -1,25 +1,17 @@
 #!/usr/bin/env bash
 # =============================================================================
-# One-click setup: install uv, sync project environment, prepare data
+# One-click setup inside the Docker container
 #
-# Usage (after git clone):
-#   bash setup.sh                # full setup: env + data
-#   bash setup.sh --env-only     # only install environment, skip data
+# Usage (inside container):
+#   bash setup.sh                # full setup: download model + prepare data
+#   bash setup.sh --data-only    # only prepare data, skip model download
 #
 # Prerequisites:
-#   - Linux with Python >= 3.10
-#   - CUDA-capable GPUs (for training)
-#   - Internet access (for downloading packages, models, datasets)
-#
-# This script will:
-#   1. Install uv (if not already installed)
-#   2. Create venv and install all dependencies via uv sync
-#   3. Download and preprocess GSM8K + MATH datasets
+#   - Running inside verlai/verl:vllm018.dev1 Docker container
+#   - GPU access via --gpus flag
+#   - Model/data volumes mounted
 # =============================================================================
 set -euo pipefail
-
-# Use HuggingFace mirror for mainland China
-export HF_ENDPOINT=https://hf-mirror.com
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
@@ -27,40 +19,29 @@ echo "=========================================="
 echo "  State-Ratio Experiment — Setup"
 echo "=========================================="
 
-# --- Step 1: Install uv if not found ---
-if ! command -v uv &>/dev/null; then
-    echo ">>> Installing uv..."
-    curl -LsSf https://astral.sh/uv/install.sh | sh
-    export PATH="$HOME/.local/bin:$PATH"
-    echo ">>> uv installed: $(uv --version)"
-else
-    echo ">>> uv already installed: $(uv --version)"
+# --- Step 1: Download model if not cached ---
+if [[ "${1:-}" != "--data-only" ]]; then
+    export MODEL_PATH=${MODEL_PATH:-$HOME/models/Qwen2.5-1.5B-Instruct}
+    if [ ! -d "$MODEL_PATH" ] || [ -z "$(ls -A "$MODEL_PATH" 2>/dev/null)" ]; then
+        echo ">>> Downloading Qwen2.5-1.5B-Instruct to $MODEL_PATH ..."
+        huggingface-cli download Qwen/Qwen2.5-1.5B-Instruct --local-dir "$MODEL_PATH"
+    else
+        echo ">>> Model already cached at $MODEL_PATH"
+    fi
 fi
 
-# --- Step 2: Sync project environment ---
-echo ">>> Syncing project environment..."
-uv sync --project "$SCRIPT_DIR"
-echo ">>> Environment ready."
-
-# --- Step 3: Prepare data (unless --env-only) ---
-if [[ "${1:-}" == "--env-only" ]]; then
-    echo ">>> Skipping data preparation (--env-only)."
-else
-    echo ">>> Preparing datasets (GSM8K + MATH)..."
-    bash "$SCRIPT_DIR/scripts/prepare_data.sh"
-    echo ">>> Data preparation complete."
-fi
+# --- Step 2: Prepare data ---
+echo ">>> Preparing datasets (GSM8K + MATH)..."
+bash "$SCRIPT_DIR/scripts/prepare_data.sh"
+echo ">>> Data preparation complete."
 
 echo ""
 echo "=========================================="
 echo "  Setup complete! To run experiments:"
 echo ""
-echo "  # Run all 3 experiments:"
-echo "  bash run_all.sh"
-echo ""
-echo "  # Run individual experiments:"
-echo "  bash run_all.sh grpo     # GRPO baseline"
-echo "  bash run_all.sh gspo     # GSPO baseline"
-echo "  bash run_all.sh sc       # State-Corrected GRPO"
-echo "  bash run_all.sh ablation # k ablation sweep"
+echo "  bash run_all.sh           # run all 3 experiments"
+echo "  bash run_all.sh grpo      # GRPO baseline"
+echo "  bash run_all.sh gspo      # GSPO baseline"
+echo "  bash run_all.sh sc        # State-Corrected GRPO"
+echo "  bash run_all.sh ablation  # k ablation sweep"
 echo "=========================================="

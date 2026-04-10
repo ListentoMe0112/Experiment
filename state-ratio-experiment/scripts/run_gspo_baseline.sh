@@ -1,17 +1,9 @@
 #!/usr/bin/env bash
 # =============================================================================
 # Experiment 2: GSPO Baseline (sequence-level geometric mean ratio clip)
-# Model: Qwen2.5-7B-Instruct | 8 GPUs | Math reasoning
+# Model: Qwen2.5-1.5B-Instruct | 2× H100 80GB | Docker: verlai/verl:vllm018.dev1
 # =============================================================================
 set -xeuo pipefail
-
-# Use HuggingFace mirror for mainland China
-export HF_ENDPOINT=https://hf-mirror.com
-# vLLM 0.9.2 V1 engine may crash in verl's async server mode; use V0 for now
-export VLLM_USE_V1=0
-
-# Project root (where pyproject.toml lives)
-PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
 # ========================= Data Paths ========================================
 gsm8k_train_path=$HOME/data/gsm8k/train.parquet
@@ -23,13 +15,13 @@ train_files="['$gsm8k_train_path', '$math_train_path']"
 test_files="['$gsm8k_test_path', '$math_test_path']"
 
 # ========================= Shared Hyperparameters ============================
-MODEL_PATH=${MODEL_PATH:-$HOME/models/Qwen2.5-7B-Instruct}
-GPUS_PER_NODE=8
+MODEL_PATH=${MODEL_PATH:-$HOME/models/Qwen2.5-1.5B-Instruct}
+GPUS_PER_NODE=2
 NNODES=1
 
-# Training
-train_batch_size=512
-ppo_mini_batch_size=128
+# Training (2× H100 80GB: batch scaled down from 8-GPU config)
+train_batch_size=128
+ppo_mini_batch_size=32
 ppo_micro_batch_size_per_gpu=4
 max_prompt_length=1024
 max_response_length=2048
@@ -42,14 +34,14 @@ lr=1e-6
 clip_ratio_low=0.0003
 clip_ratio_high=0.0004
 
-# Rollout
-rollout_tp=2
-gpu_memory_utilization=0.4
+# Rollout (H100 80GB: TP=1 so each GPU runs independent rollout)
+rollout_tp=1
+gpu_memory_utilization=0.6
 temperature=1.0
 top_p=1.0
 
 # ========================= Run ===============================================
-uv run --project "$PROJECT_ROOT" python3 -m verl.trainer.main_ppo \
+python3 -m verl.trainer.main_ppo \
     algorithm.adv_estimator=grpo \
     actor_rollout_ref.actor.policy_loss.loss_mode=gspo \
     data.train_files="$train_files" \
@@ -92,7 +84,7 @@ uv run --project "$PROJECT_ROOT" python3 -m verl.trainer.main_ppo \
     trainer.critic_warmup=0 \
     trainer.logger='["console"]' \
     trainer.project_name='state_ratio_experiment' \
-    trainer.experiment_name='gspo_baseline_qwen2.5_7b' \
+    trainer.experiment_name='gspo_baseline_qwen2.5_1.5b' \
     trainer.n_gpus_per_node=$GPUS_PER_NODE \
     trainer.nnodes=$NNODES \
     trainer.val_before_train=True \
