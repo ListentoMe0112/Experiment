@@ -32,7 +32,7 @@ docker build -t "$IMAGE_NAME" "$SCRIPT_DIR"
 echo ">>> Starting container with ${GPUS:-all} GPUs ..."
 docker run --rm -it \
     --gpus "${GPUS:-all}" \
-    --shm-size=16g \
+    --shm-size=256g \
     --ulimit memlock=-1 \
     --ulimit stack=67108864 \
     -v "$MODEL_DIR:/root/models" \

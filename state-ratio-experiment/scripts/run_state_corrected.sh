@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # =============================================================================
 # Experiment 3: State-Corrected GRPO (truncated prefix IS correction)
-# Model: Qwen2.5-7B-Instruct | 2× H100 80GB | Docker: verlai/verl:vllm018.dev1
+# Model: Qwen2.5-7B-Instruct | 8× H100 80GB | Docker: verlai/verl:vllm018.dev1
 #
 # This is the novel method from "Outlook: Recovering the State Ratio via
 # Deterministic Transitions". It adds a truncated prefix product of per-token
@@ -13,7 +13,7 @@
 #   k=10 → more correction, higher variance
 #   k=-1 → full trajectory IS (exact but explosive variance)
 # =============================================================================
-set -xeuo pipefail
+set -xuo pipefail
 
 # ========================= Data Paths ========================================
 gsm8k_train_path=$HOME/data/gsm8k/train.parquet
@@ -26,18 +26,17 @@ test_files="['$gsm8k_test_path', '$math_test_path']"
 
 # ========================= Shared Hyperparameters ============================
 MODEL_PATH=${MODEL_PATH:-$HOME/models/Qwen2.5-7B-Instruct}
-GPUS_PER_NODE=2
+GPUS_PER_NODE=8
 NNODES=1
 
-# Training (2× H100 80GB: batch scaled down from 8-GPU config)
-train_batch_size=128
-ppo_mini_batch_size=32
+# Training (8× H100 80GB)
+train_batch_size=512
+ppo_mini_batch_size=128
 ppo_micro_batch_size_per_gpu=4
 max_prompt_length=1024
 max_response_length=2048
 n_resp_per_prompt=8
 total_epochs=15
-total_training_steps=-1
 lr=1e-6
 
 # Rollout (H100 80GB: TP=1 so each GPU runs independent rollout)
@@ -96,6 +95,7 @@ python3 -m verl.trainer.main_ppo \
     actor_rollout_ref.rollout.tensor_model_parallel_size=$rollout_tp \
     actor_rollout_ref.rollout.name=vllm \
     actor_rollout_ref.rollout.gpu_memory_utilization=$gpu_memory_utilization \
+    actor_rollout_ref.rollout.checkpoint_engine.update_weights_bucket_megabytes=4096 \
     actor_rollout_ref.rollout.enforce_eager=False \
     actor_rollout_ref.rollout.free_cache_engine=True \
     actor_rollout_ref.rollout.n=$n_resp_per_prompt \
@@ -112,5 +112,4 @@ python3 -m verl.trainer.main_ppo \
     trainer.save_freq=20 \
     trainer.test_freq=5 \
     trainer.total_epochs=$total_epochs \
-    trainer.total_training_steps=$total_training_steps \
     "$@"

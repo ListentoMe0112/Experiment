@@ -9,7 +9,7 @@
 #
 # All experiments share:
 #   - Model: Qwen2.5-7B-Instruct
-#   - Hardware: 2× H100 80GB (single node)
+#   - Hardware: 8× H100 80GB (single node)
 #   - Docker: verlai/verl:vllm018.dev1
 #   - Data: GSM8K + MATH
 #   - Advantage: GRPO (group-relative normalization)
