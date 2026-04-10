@@ -2,13 +2,13 @@
 name = "state-ratio-experiment"
 version = "0.1.0"
 description = "State-Corrected GRPO: Recovering the state distribution ratio via deterministic transitions"
-requires-python = ">=3.10"
+requires-python = ">=3.10,<3.11"
 dependencies = [
     "verl==0.7.1",
-    "torch==2.9.1",
-    "transformers==4.52.4",
+    "torch==2.6.0",
+    "transformers>=4.48,<4.53",
     "datasets",
-    "vllm>=0.8.5",
+    "vllm>=0.8.5,<0.9",
 ]
 
 [project.optional-dependencies]
