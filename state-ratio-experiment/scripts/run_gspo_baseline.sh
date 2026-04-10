@@ -22,7 +22,7 @@ train_files="['$gsm8k_train_path', '$math_train_path']"
 test_files="['$gsm8k_test_path', '$math_test_path']"
 
 # ========================= Shared Hyperparameters ============================
-MODEL_PATH=Qwen/Qwen2.5-7B-Instruct
+MODEL_PATH=${MODEL_PATH:-$HOME/models/Qwen2.5-7B-Instruct}
 GPUS_PER_NODE=8
 NNODES=1
 

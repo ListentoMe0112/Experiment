@@ -22,7 +22,7 @@ train_files="['$gsm8k_train_path', '$math_train_path']"
 test_files="['$gsm8k_test_path', '$math_test_path']"
 
 # ========================= Shared Hyperparameters ============================
-MODEL_PATH=Qwen/Qwen2.5-7B-Instruct
+MODEL_PATH=${MODEL_PATH:-$HOME/models/Qwen2.5-7B-Instruct}
 GPUS_PER_NODE=8
 NNODES=1
 
@@ -61,9 +61,7 @@ uv run --project "$PROJECT_ROOT" python3 -m verl.trainer.main_ppo \
     actor_rollout_ref.actor.ppo_micro_batch_size_per_gpu=$ppo_micro_batch_size_per_gpu \
     actor_rollout_ref.actor.use_dynamic_bsz=True \
     actor_rollout_ref.actor.ppo_max_token_len_per_gpu=$(((max_prompt_length + max_response_length) * 2)) \
-    actor_rollout_ref.actor.use_kl_loss=True \
-    actor_rollout_ref.actor.kl_loss_coef=0.001 \
-    actor_rollout_ref.actor.kl_loss_type=low_var_kl \
+    actor_rollout_ref.actor.use_kl_loss=False \
     actor_rollout_ref.actor.entropy_coeff=0 \
     actor_rollout_ref.actor.clip_ratio=0.2 \
     actor_rollout_ref.actor.clip_ratio_low=0.2 \
@@ -80,10 +78,7 @@ uv run --project "$PROJECT_ROOT" python3 -m verl.trainer.main_ppo \
     actor_rollout_ref.rollout.n=$n_resp_per_prompt \
     actor_rollout_ref.rollout.temperature=$temperature \
     actor_rollout_ref.rollout.top_p=$top_p \
-    actor_rollout_ref.ref.log_prob_micro_batch_size_per_gpu=16 \
-    actor_rollout_ref.ref.log_prob_use_dynamic_bsz=True \
-    actor_rollout_ref.ref.log_prob_max_token_len_per_gpu=$(((max_prompt_length + max_response_length) * 3)) \
-    actor_rollout_ref.ref.fsdp_config.param_offload=True \
+
     algorithm.use_kl_in_reward=False \
     trainer.critic_warmup=0 \
     trainer.logger='["console"]' \
