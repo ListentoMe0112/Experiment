@@ -8,7 +8,7 @@
 #   3. SC-GRPO (ours)    — GRPO + truncated prefix state correction (k=5)
 #
 # All experiments share:
-#   - Model: Qwen2.5-1.5B-Instruct
+#   - Model: Qwen2.5-7B-Instruct
 #   - Hardware: 2× H100 80GB (single node)
 #   - Docker: verlai/verl:vllm018.dev1
 #   - Data: GSM8K + MATH
@@ -28,10 +28,10 @@ set -xeuo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 # ========================= Download model if not cached =======================
-export MODEL_PATH=${MODEL_PATH:-$HOME/models/Qwen2.5-1.5B-Instruct}
+export MODEL_PATH=${MODEL_PATH:-$HOME/models/Qwen2.5-7B-Instruct}
 if [ ! -d "$MODEL_PATH" ] || [ -z "$(ls -A "$MODEL_PATH" 2>/dev/null)" ]; then
-    echo ">>> Downloading Qwen2.5-1.5B-Instruct to $MODEL_PATH ..."
-    huggingface-cli download Qwen/Qwen2.5-1.5B-Instruct --local-dir "$MODEL_PATH"
+    echo ">>> Downloading Qwen2.5-7B-Instruct to $MODEL_PATH ..."
+    huggingface-cli download Qwen/Qwen2.5-7B-Instruct --local-dir "$MODEL_PATH"
 fi
 # Use offline mode during training to avoid per-worker network requests
 export HF_HUB_OFFLINE=1
