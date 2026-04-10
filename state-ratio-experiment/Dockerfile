@@ -1,8 +1,9 @@
 FROM verlai/verl:vllm018.dev1
 
-# The base image already includes: verl, vllm, torch, flash-attn, transformers, etc.
-# We only need to ensure datasets is available for data preprocessing.
-RUN pip install --no-cache-dir -i https://mirrors.cloud.tencent.com/pypi/simple datasets
+# The base image includes: vllm, torch, flash-attn, transformers, etc.
+# We still need: verl (RL training framework) and datasets (data preprocessing)
+RUN pip install --no-cache-dir -i https://mirrors.cloud.tencent.com/pypi/simple \
+    "verl>=0.7.1" datasets
 
 # Set working directory
 WORKDIR /workspace/state-ratio-experiment

@@ -12,20 +12,20 @@ dependencies = [
 
     # Core framework  (cu124 wheel resolved via [tool.uv.index])
     "torch==2.6.0",
-    "verl==0.5.0",
+    "verl>=0.7.1",
 
-    # vllm 0.7.3 is compatible with torch 2.6.0
-    "vllm==0.7.3",
+    # vllm 0.8.x is bundled in the base Docker image (verlai/verl:vllm018.dev1)
+    "vllm>=0.8.0",
 
-    # transformers compatible with verl 0.5.0 + vllm 0.7.3
-    "transformers>=4.48.0,<4.50.0",
+    # transformers compatible with verl 0.7.x + vllm 0.8.x
+    "transformers>=4.48.0",
 
     # flash-attn: source-only build, needs torch at build time (see [tool.uv])
     "flash-attn>=2.7.0",
 
-    # verl 0.5.0 constraints
+    # verl 0.7.x constraints
     "numpy<2.0.0",
-    "tensordict>=0.8.0,<=0.9.1,!=0.9.0",
+    "tensordict>=0.8.0,<=0.10.0,!=0.9.0",
     "datasets",
 ]
 

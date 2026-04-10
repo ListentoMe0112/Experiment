@@ -24,7 +24,7 @@ if [[ "${1:-}" != "--data-only" ]]; then
     export MODEL_PATH=${MODEL_PATH:-$HOME/models/Qwen2.5-7B-Instruct}
     if [ ! -d "$MODEL_PATH" ] || [ -z "$(ls -A "$MODEL_PATH" 2>/dev/null)" ]; then
         echo ">>> Downloading Qwen2.5-7B-Instruct to $MODEL_PATH ..."
-        huggingface-cli download Qwen/Qwen2.5-7B-Instruct --local-dir "$MODEL_PATH"
+        python -c "from huggingface_hub import snapshot_download; snapshot_download('Qwen/Qwen2.5-7B-Instruct', local_dir='$MODEL_PATH')"
     else
         echo ">>> Model already cached at $MODEL_PATH"
     fi
