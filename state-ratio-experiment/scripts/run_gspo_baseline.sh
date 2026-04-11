@@ -26,6 +26,7 @@ ppo_micro_batch_size_per_gpu=8
 max_prompt_length=2048
 max_response_length=4096
 n_resp_per_prompt=8
+ppo_epochs=4              # offline updates per rollout batch (default=1)
 total_epochs=15
 lr=2e-6
 
@@ -57,6 +58,7 @@ python3 -m verl.trainer.main_ppo \
     actor_rollout_ref.model.use_remove_padding=True \
     actor_rollout_ref.actor.ppo_mini_batch_size=$ppo_mini_batch_size \
     actor_rollout_ref.actor.ppo_micro_batch_size_per_gpu=$ppo_micro_batch_size_per_gpu \
+    actor_rollout_ref.actor.ppo_epochs=$ppo_epochs \
     actor_rollout_ref.actor.use_dynamic_bsz=True \
     actor_rollout_ref.actor.ppo_max_token_len_per_gpu=$(((max_prompt_length + max_response_length) * 2)) \
     actor_rollout_ref.actor.use_kl_loss=False \
