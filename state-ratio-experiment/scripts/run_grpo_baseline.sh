@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # =============================================================================
 # Experiment 1: GRPO Baseline (k=0, no state correction)
-# Model: Qwen2.5-7B-Instruct | 8× H100 80GB | Docker: verlai/verl:vllm018.dev1
+# Model: Qwen2.5-1.5B-Instruct | 8× H100 80GB | Docker: verlai/verl:vllm018.dev1
 # =============================================================================
 set -xuo pipefail
 
@@ -15,23 +15,23 @@ train_files="['$gsm8k_train_path', '$math_train_path']"
 test_files="['$gsm8k_test_path', '$math_test_path']"
 
 # ========================= Shared Hyperparameters ============================
-MODEL_PATH=${MODEL_PATH:-$HOME/models/Qwen2.5-7B-Instruct}
+MODEL_PATH=${MODEL_PATH:-$HOME/models/Qwen2.5-1.5B-Instruct}
 GPUS_PER_NODE=8
 NNODES=1
 
-# Training (8× H100 80GB)
-train_batch_size=512
-ppo_mini_batch_size=128
-ppo_micro_batch_size_per_gpu=4
-max_prompt_length=1024
-max_response_length=2048
+# Training (8× H100 80GB) - Optimized for 1.5B model
+train_batch_size=1024
+ppo_mini_batch_size=256
+ppo_micro_batch_size_per_gpu=8
+max_prompt_length=2048
+max_response_length=4096
 n_resp_per_prompt=8
 total_epochs=15
-lr=1e-6
+lr=2e-6
 
 # Rollout (H100 80GB: TP=1 so each GPU runs independent rollout)
 rollout_tp=1
-gpu_memory_utilization=0.6
+gpu_memory_utilization=0.8  # Increased for 1.5B model
 temperature=1.0
 top_p=1.0
 
@@ -78,7 +78,7 @@ python3 -m verl.trainer.main_ppo \
     trainer.critic_warmup=0 \
     trainer.logger='["console"]' \
     trainer.project_name='state_ratio_experiment' \
-    trainer.experiment_name='grpo_baseline_qwen2.5_7b' \
+    trainer.experiment_name='grpo_baseline_qwen2.5_1.5b' \
     trainer.n_gpus_per_node=$GPUS_PER_NODE \
     trainer.nnodes=$NNODES \
     trainer.val_before_train=True \

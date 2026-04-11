@@ -38,7 +38,7 @@ docker run --rm -it \
     -v "$MODEL_DIR:/root/models" \
     -v "$DATA_DIR:/root/data" \
     -v "$OUTPUT_DIR:/root/output" \
-    -e MODEL_PATH=/root/models/Qwen2.5-7B-Instruct \
+    -e MODEL_PATH=/root/models/Qwen2.5-1.5B-Instruct \
     -e HF_HOME=/root/models/hf_cache \
     "$IMAGE_NAME" \
     "${@:-bash}"

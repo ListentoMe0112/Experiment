@@ -21,10 +21,10 @@ echo "=========================================="
 
 # --- Step 1: Download model if not cached ---
 if [[ "${1:-}" != "--data-only" ]]; then
-    export MODEL_PATH=${MODEL_PATH:-$HOME/models/Qwen2.5-7B-Instruct}
+    export MODEL_PATH=${MODEL_PATH:-$HOME/models/Qwen2.5-1.5B-Instruct}
     if [ ! -d "$MODEL_PATH" ] || [ -z "$(ls -A "$MODEL_PATH" 2>/dev/null)" ]; then
-        echo ">>> Downloading Qwen2.5-7B-Instruct to $MODEL_PATH ..."
-        python -c "from huggingface_hub import snapshot_download; snapshot_download('Qwen/Qwen2.5-7B-Instruct', local_dir='$MODEL_PATH')"
+        echo ">>> Downloading Qwen2.5-1.5B-Instruct to $MODEL_PATH ..."
+        python -c "from huggingface_hub import snapshot_download; snapshot_download('Qwen/Qwen2.5-1.5B-Instruct', local_dir='$MODEL_PATH')"
     else
         echo ">>> Model already cached at $MODEL_PATH"
     fi
