@@ -1,17 +1,23 @@
 #!/usr/bin/env bash
 # =============================================================================
-# Experiment 3: State-Corrected GRPO (truncated prefix IS correction)
+# Experiment: State-Corrected GRPO (prefix IS correction)
 # Model: Qwen2.5-1.5B-Instruct | 8× H100 80GB | Docker: verlai/verl:vllm018.dev1
 #
-# This is the novel method from "Outlook: Recovering the State Ratio via
-# Deterministic Transitions". It adds a truncated prefix product of per-token
-# IS ratios as a state distribution correction weight to the standard GRPO loss.
+# This implements the prefix state-ratio correction from the Outlook section.
+# In autoregressive LLMs, transitions are deterministic, so:
+#   d^{π_θ}(s_t) / d^{π_β}(s_t) = ∏_{j=1}^{t-1} r_j(θ)
 #
-# Key hyperparameter: state_correction_lookback_k
-#   k=0  → degenerates to standard GRPO
-#   k=5  → correct state mismatch from last 5 tokens (recommended start)
-#   k=10 → more correction, higher variance
-#   k=-1 → full trajectory IS (exact but explosive variance)
+# Supported strategies (set via SC_STRATEGY):
+#   truncated_window  — w_t = ∏_{j=max(1,t-k)}^{t-1} r_j  (default)
+#   min_prefix        — w_t = min_{j<t} r_j  (MinPRO-style)
+#   vtrace            — w_t = ∏_{j<t} min(c̄, r_j)  (V-trace truncated IS)
+#   log_ema           — w_t = exp(EMA of log r_j)  (smooth tracking)
+#   self_normalized   — w_t = ρ_{1:t} / Σ_i ρ_{1:t}^{(i)}  (group-normalized)
+#   none              — no state correction (GRPO + clip baseline)
+#
+# Key: old_log_prob = π_β (rollout policy). We use bypass_mode to skip
+# _compute_old_log_prob() and directly use rollout engine's log_probs.
+# This ensures old_log_probs IS EXACTLY π_β, not a recomputed approximation.
 # =============================================================================
 set -xuo pipefail
 
@@ -32,36 +38,73 @@ NNODES=1
 # Training (8× H100 80GB) - Optimized for 1.5B model
 train_batch_size=1024
 ppo_mini_batch_size=256
-ppo_micro_batch_size_per_gpu=8
-max_prompt_length=2048
-max_response_length=4096
+ppo_micro_batch_size_per_gpu=4
+max_prompt_length=1024
+max_response_length=2048
 n_resp_per_prompt=8
-ppo_epochs=4              # offline updates per rollout batch (default=1)
+ppo_epochs=4              # offline updates per rollout batch
 total_epochs=15
 lr=2e-6
 
-# Rollout (H100 80GB: TP=1 so each GPU runs independent rollout)
+# Rollout
 rollout_tp=1
-gpu_memory_utilization=0.8  # Increased for 1.5B model
+gpu_memory_utilization=0.4
 temperature=1.0
 top_p=1.0
 
 # ========================= State Correction Hyperparameters ==================
-# Lookback window k (main ablation axis)
-# Override via: LOOKBACK_K=10 bash run_state_corrected.sh
+# Strategy: truncated_window | min_prefix | vtrace | log_ema | self_normalized | none
+SC_STRATEGY=${SC_STRATEGY:-truncated_window}
+
+# For truncated_window: lookback window k
+# k=0 → no state correction, k=5 → moderate, k=-1 → full trajectory
 LOOKBACK_K=${LOOKBACK_K:-5}
 
-# Weight clipping bounds for state correction
+# For vtrace: truncation threshold c̄
+VTRACE_C=${VTRACE_C:-1.0}
+
+# For log_ema: smoothing factor α
+EMA_ALPHA=${EMA_ALPHA:-0.9}
+
+# Weight clipping bounds
 MAX_STATE_WEIGHT=${MAX_STATE_WEIGHT:-5.0}
 MIN_STATE_WEIGHT=${MIN_STATE_WEIGHT:-0.2}
 
+# PPO clip ratios (asymmetric: wider for exploration)
+CLIP_RATIO_LOW=${CLIP_RATIO_LOW:-0.2}
+CLIP_RATIO_HIGH=${CLIP_RATIO_HIGH:-0.28}
+
 # ========================= Run ===============================================
+# Export state correction hyperparameters as environment variables
+export SC_STRATEGY=$SC_STRATEGY
+export SC_LOOKBACK_K=$LOOKBACK_K
+export SC_VTRACE_C=$VTRACE_C
+export SC_EMA_ALPHA=$EMA_ALPHA
+export SC_MAX_STATE_WEIGHT=$MAX_STATE_WEIGHT
+export SC_MIN_STATE_WEIGHT=$MIN_STATE_WEIGHT
+
+# Build experiment name
+if [ "$SC_STRATEGY" = "truncated_window" ]; then
+    EXP_NAME="sc_${SC_STRATEGY}_k${LOOKBACK_K}_qwen2.5_1.5b"
+elif [ "$SC_STRATEGY" = "vtrace" ]; then
+    EXP_NAME="sc_${SC_STRATEGY}_c${VTRACE_C}_qwen2.5_1.5b"
+elif [ "$SC_STRATEGY" = "log_ema" ]; then
+    EXP_NAME="sc_${SC_STRATEGY}_a${EMA_ALPHA}_qwen2.5_1.5b"
+else
+    EXP_NAME="sc_${SC_STRATEGY}_qwen2.5_1.5b"
+fi
+
 # Verify the custom loss module is importable
-python3 -c "import state_corrected_loss; print('Registered state_corrected_grpo loss')"
+python3 -c "import state_corrected_loss; print('Registered state_corrected_grpo loss')" || {
+    echo 'ERROR: Cannot import state_corrected_loss.py. Make sure it is in PYTHONPATH or cwd.'
+    exit 1
+}
 
 python3 -m verl.trainer.main_ppo \
     algorithm.adv_estimator=grpo \
     actor_rollout_ref.actor.policy_loss.loss_mode=state_corrected_grpo \
+    actor_rollout_ref.rollout.calculate_log_probs=True \
+    +algorithm.rollout_correction.bypass_mode=True \
     data.train_files="$train_files" \
     data.val_files="$test_files" \
     data.train_batch_size=$train_batch_size \
@@ -70,6 +113,7 @@ python3 -m verl.trainer.main_ppo \
     data.filter_overlong_prompts=True \
     data.truncation='error' \
     actor_rollout_ref.model.path=$MODEL_PATH \
+    actor_rollout_ref.model.external_lib=state_corrected_loss \
     +actor_rollout_ref.model.override_config.attn_implementation=flash_attention_2 \
     actor_rollout_ref.actor.optim.lr=$lr \
     actor_rollout_ref.actor.optim.lr_warmup_steps_ratio=0.05 \
@@ -81,13 +125,10 @@ python3 -m verl.trainer.main_ppo \
     actor_rollout_ref.actor.ppo_max_token_len_per_gpu=$(((max_prompt_length + max_response_length) * 2)) \
     actor_rollout_ref.actor.use_kl_loss=False \
     actor_rollout_ref.actor.entropy_coeff=0 \
-    actor_rollout_ref.actor.clip_ratio=0.2 \
-    actor_rollout_ref.actor.clip_ratio_low=0.2 \
-    actor_rollout_ref.actor.clip_ratio_high=0.2 \
-    +actor_rollout_ref.actor.state_correction_lookback_k=$LOOKBACK_K \
-    +actor_rollout_ref.actor.state_correction_max_weight=$MAX_STATE_WEIGHT \
-    +actor_rollout_ref.actor.state_correction_min_weight=$MIN_STATE_WEIGHT \
-    actor_rollout_ref.actor.loss_agg_mode=seq-mean-token-mean \
+    actor_rollout_ref.actor.clip_ratio=$CLIP_RATIO_LOW \
+    actor_rollout_ref.actor.clip_ratio_low=$CLIP_RATIO_LOW \
+    actor_rollout_ref.actor.clip_ratio_high=$CLIP_RATIO_HIGH \
+    actor_rollout_ref.actor.loss_agg_mode=token-mean \
     actor_rollout_ref.model.enable_gradient_checkpointing=True \
     actor_rollout_ref.actor.fsdp_config.param_offload=False \
     actor_rollout_ref.actor.fsdp_config.optimizer_offload=False \
@@ -107,7 +148,7 @@ python3 -m verl.trainer.main_ppo \
     trainer.critic_warmup=0 \
     trainer.logger='["console"]' \
     trainer.project_name='state_ratio_experiment' \
-    trainer.experiment_name="sc_grpo_k${LOOKBACK_K}_qwen2.5_1.5b" \
+    trainer.experiment_name="$EXP_NAME" \
     trainer.n_gpus_per_node=$GPUS_PER_NODE \
     trainer.nnodes=$NNODES \
     trainer.val_before_train=True \

@@ -22,9 +22,9 @@ NNODES=1
 # Training (8× H100 80GB) - Optimized for 1.5B model
 train_batch_size=1024
 ppo_mini_batch_size=256
-ppo_micro_batch_size_per_gpu=8
-max_prompt_length=2048
-max_response_length=4096
+ppo_micro_batch_size_per_gpu=4
+max_prompt_length=1024
+max_response_length=2048
 n_resp_per_prompt=8
 ppo_epochs=4              # offline updates per rollout batch (default=1)
 total_epochs=15
@@ -66,7 +66,7 @@ python3 -m verl.trainer.main_ppo \
     actor_rollout_ref.actor.entropy_coeff=0 \
     actor_rollout_ref.actor.clip_ratio_low=$clip_ratio_low \
     actor_rollout_ref.actor.clip_ratio_high=$clip_ratio_high \
-    actor_rollout_ref.actor.loss_agg_mode=seq-mean-token-mean \
+    actor_rollout_ref.actor.loss_agg_mode=token-mean \
     actor_rollout_ref.model.enable_gradient_checkpointing=True \
     actor_rollout_ref.actor.fsdp_config.param_offload=False \
     actor_rollout_ref.actor.fsdp_config.optimizer_offload=False \
