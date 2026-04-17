@@ -50,6 +50,16 @@ if [ ! -d "$MODEL_PATH" ] || [ -z "$(ls -A "$MODEL_PATH" 2>/dev/null)" ]; then
 fi
 export HF_HUB_OFFLINE=1
 
+# ========================= Output directory =====================================
+export OUTPUT_DIR=${OUTPUT_DIR:-$HOME/output}
+LOG_DIR="$OUTPUT_DIR/logs"
+mkdir -p "$LOG_DIR"
+
+# Redirect all stdout+stderr to a timestamped master log file (and still print to console)
+MASTER_LOG="$LOG_DIR/run_all_$(date +%Y%m%d_%H%M%S).log"
+exec > >(tee -a "$MASTER_LOG") 2>&1
+echo ">>> Master log: $MASTER_LOG"
+
 chmod +x "$SCRIPT_DIR"/scripts/*.sh
 
 TARGET=${1:-all}

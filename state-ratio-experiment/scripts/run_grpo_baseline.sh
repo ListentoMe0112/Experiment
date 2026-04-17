@@ -5,7 +5,14 @@
 # =============================================================================
 set -xuo pipefail
 
-# ========================= Data Paths ========================================
+# ========================= Output & Data Paths ===============================
+# OUTPUT_DIR must match the Docker volume mount (docker-run.sh: -v $HOME/output:/root/output)
+OUTPUT_DIR=${OUTPUT_DIR:-$HOME/output}
+mkdir -p "$OUTPUT_DIR"
+
+# File logger: write jsonl logs under OUTPUT_DIR for persistent error capture
+export VERL_FILE_LOGGER_ROOT="$OUTPUT_DIR/logs"
+
 gsm8k_train_path=$HOME/data/gsm8k/train.parquet
 gsm8k_test_path=$HOME/data/gsm8k/test.parquet
 math_train_path=$HOME/data/math/train.parquet
@@ -79,12 +86,13 @@ python3 -m verl.trainer.main_ppo \
     actor_rollout_ref.rollout.top_p=$top_p \
     algorithm.use_kl_in_reward=False \
     trainer.critic_warmup=0 \
-    trainer.logger='["console"]' \
+    trainer.logger='["console","file"]' \
     trainer.project_name='state_ratio_experiment' \
     trainer.experiment_name='grpo_baseline_qwen2.5_1.5b' \
     trainer.n_gpus_per_node=$GPUS_PER_NODE \
     trainer.nnodes=$NNODES \
     trainer.val_before_train=True \
+    trainer.default_local_dir="$OUTPUT_DIR/checkpoints/grpo_baseline_qwen2.5_1.5b" \
     trainer.save_freq=20 \
     trainer.test_freq=5 \
     trainer.total_epochs=$total_epochs \

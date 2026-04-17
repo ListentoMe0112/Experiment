@@ -348,13 +348,33 @@ def compute_policy_loss_state_corrected_grpo(
     # only through log_prob (REINFORCE-style).
     log_min = math.log(min_state_weight)
     log_max = math.log(max_state_weight)
+
+    # Identify tokens where state_weight would be clamped (off-policy too far).
+    # For these tokens, we detach log_prob so no gradient flows through them,
+    # but the loss VALUE is preserved (keeps loss magnitude stable for agg_loss).
+    with torch.no_grad():
+        not_clamped_mask = (
+            (log_state_weight >= log_min) & (log_state_weight <= log_max)
+        ).float()  # 1.0 = within bounds (gradient flows), 0.0 = clamped (no gradient)
+
     log_state_weight = torch.clamp(log_state_weight, min=log_min, max=log_max)
     state_weight = torch.exp(log_state_weight).detach()  # stop gradient!
 
     # --- Final loss: REINFORCE-style ---
     # loss = -w_t · log π_θ(a_t|s_t) · A_t  where w_t = state_ratio × action_ratio
     # Gradient: ∇_θ L = -w_t · A_t · ∇_θ log π_θ  (w_t detached)
-    pg_losses = -state_weight * log_prob * advantages
+    #
+    # For clamped tokens: use detached log_prob so loss value is preserved
+    # but no gradient flows. This avoids:
+    #   1. Loss magnitude collapse (if we zeroed out clamped tokens)
+    #   2. Gradient instability from unreliable IS weights
+    #   3. Denominator mismatch in agg_loss (batch_num_tokens stays correct)
+    log_prob_for_loss = torch.where(
+        not_clamped_mask.bool(),
+        log_prob,                # gradient flows for unclamped tokens
+        log_prob.detach(),       # no gradient for clamped tokens
+    )
+    pg_losses = -state_weight * log_prob_for_loss * advantages
 
     # NaN/Inf safety
     if torch.isnan(pg_losses).any() or torch.isinf(pg_losses).any():
@@ -378,10 +398,10 @@ def compute_policy_loss_state_corrected_grpo(
         max_sw = (state_weight * response_mask).max()
         std_sw = verl_F.masked_mean((state_weight - mean_sw) ** 2, response_mask).sqrt()
 
-        # Fraction of tokens where state weight was clamped
-        clamped_high = (state_weight >= max_state_weight - 1e-6).float()
-        clamped_low = (state_weight <= min_state_weight + 1e-6).float()
-        clamp_frac = verl_F.masked_mean(clamped_high + clamped_low, response_mask)
+        # Fraction of tokens where state weight was clamped (gradient skipped)
+        clamp_frac = verl_F.masked_mean(1.0 - not_clamped_mask, response_mask)
+        # Fraction of response tokens that actually contribute to the gradient
+        active_frac = verl_F.masked_mean(not_clamped_mask, response_mask)
 
         # Per-token action ratio diagnostics (for monitoring)
         ratio = torch.exp(log_ratio)
@@ -395,6 +415,7 @@ def compute_policy_loss_state_corrected_grpo(
         "actor/state_weight_max": max_sw.detach().item(),
         "actor/state_weight_std": std_sw.detach().item(),
         "actor/state_weight_clamp_frac": clamp_frac.detach().item(),
+        "actor/active_token_frac": active_frac.detach().item(),
         # Per-token action ratio (for monitoring)
         "actor/ratio_mean": ratio_mean.detach().item(),
         "actor/ratio_max": ratio_max.detach().item(),
