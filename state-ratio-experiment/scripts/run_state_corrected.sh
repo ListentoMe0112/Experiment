@@ -8,12 +8,15 @@
 #   d^{π_θ}(s_t) / d^{π_β}(s_t) = ∏_{j=1}^{t-1} r_j(θ)
 #
 # Supported strategies (set via SC_STRATEGY):
-#   truncated_window  — w_t = ∏_{j=max(1,t-k)}^{t-1} r_j  (default)
-#   min_prefix        — w_t = min_{j<t} r_j  (MinPRO-style)
-#   vtrace            — w_t = ∏_{j<t} min(c̄, r_j)  (V-trace truncated IS)
-#   log_ema           — w_t = exp(EMA of log r_j)  (smooth tracking)
-#   self_normalized   — w_t = ρ_{1:t} / Σ_i ρ_{1:t}^{(i)}  (group-normalized)
-#   none              — no state correction (GRPO + clip baseline)
+#   truncated_window   — w_t = ∏_{j=max(1,t-k)}^{t-1} r_j  (default)
+#   min_prefix         — w_t = min_{j<t} r_j  (MinPRO-style)
+#   vtrace             — w_t = ∏_{j<t} min(c̄, r_j)  (V-trace truncated IS)
+#   log_ema            — w_t = exp(EMA of log r_j)  (smooth tracking)
+#   self_normalized    — w_t = ρ_{1:t} / Σ_i ρ_{1:t}^{(i)}  (batch-normalized)
+#   baseline_corrected — w_t = r_t · ρ_{1:t-1} / GeoMean_group(ρ_{1:t-1})
+#                        (cross-group control variate; unbiased, corrects timestep drift)
+#   none               — raw full product (no variance reduction, high variance)
+#   identity           — w_t = 1 (pure REINFORCE, completely eliminates state correction)
 #
 # Key: old_log_prob = π_β (rollout policy). We use bypass_mode to skip
 # _compute_old_log_prob() and directly use rollout engine's log_probs.
@@ -44,7 +47,7 @@ NNODES=1
 
 # Training (8× H100 80GB) - Optimized for 1.5B model
 train_batch_size=1024
-ppo_mini_batch_size=256
+ppo_mini_batch_size=1024
 ppo_micro_batch_size_per_gpu=4
 max_prompt_length=1024
 max_response_length=2048
@@ -60,7 +63,8 @@ temperature=1.0
 top_p=1.0
 
 # ========================= State Correction Hyperparameters ==================
-# Strategy: truncated_window | min_prefix | vtrace | log_ema | self_normalized | none
+# Strategy: truncated_window | min_prefix | vtrace | log_ema | self_normalized
+#         | baseline_corrected | none | identity
 SC_STRATEGY=${SC_STRATEGY:-truncated_window}
 
 # For truncated_window: lookback window k
@@ -72,6 +76,11 @@ VTRACE_C=${VTRACE_C:-1.0}
 
 # For log_ema: smoothing factor α
 EMA_ALPHA=${EMA_ALPHA:-0.9}
+
+# For baseline_corrected: group size (number of rollouts per prompt).
+# MUST equal actor_rollout_ref.rollout.n so the (B, T) batch reshapes cleanly
+# into (num_prompts, G, T) for per-prompt geometric centering of ρ_{1:t-1}.
+SC_GROUP_SIZE=${SC_GROUP_SIZE:-$n_resp_per_prompt}
 
 # Weight clipping bounds
 MAX_STATE_WEIGHT=${MAX_STATE_WEIGHT:-5.0}
@@ -87,8 +96,15 @@ export SC_STRATEGY=$SC_STRATEGY
 export SC_LOOKBACK_K=$LOOKBACK_K
 export SC_VTRACE_C=$VTRACE_C
 export SC_EMA_ALPHA=$EMA_ALPHA
+export SC_GROUP_SIZE=$SC_GROUP_SIZE
 export SC_MAX_STATE_WEIGHT=$MAX_STATE_WEIGHT
 export SC_MIN_STATE_WEIGHT=$MIN_STATE_WEIGHT
+
+# Sanity check: baseline_corrected requires group_size == rollout.n
+if [ "$SC_STRATEGY" = "baseline_corrected" ] && [ "$SC_GROUP_SIZE" != "$n_resp_per_prompt" ]; then
+    echo "ERROR: SC_GROUP_SIZE ($SC_GROUP_SIZE) must equal n_resp_per_prompt ($n_resp_per_prompt) for baseline_corrected."
+    exit 1
+fi
 
 # Build experiment name
 if [ "$SC_STRATEGY" = "truncated_window" ]; then
@@ -97,6 +113,8 @@ elif [ "$SC_STRATEGY" = "vtrace" ]; then
     EXP_NAME="sc_${SC_STRATEGY}_c${VTRACE_C}_qwen2.5_1.5b"
 elif [ "$SC_STRATEGY" = "log_ema" ]; then
     EXP_NAME="sc_${SC_STRATEGY}_a${EMA_ALPHA}_qwen2.5_1.5b"
+elif [ "$SC_STRATEGY" = "baseline_corrected" ]; then
+    EXP_NAME="sc_${SC_STRATEGY}_g${SC_GROUP_SIZE}_qwen2.5_1.5b"
 else
     EXP_NAME="sc_${SC_STRATEGY}_qwen2.5_1.5b"
 fi
@@ -111,7 +129,7 @@ python3 -m verl.trainer.main_ppo \
     algorithm.adv_estimator=grpo \
     actor_rollout_ref.actor.policy_loss.loss_mode=state_corrected_grpo \
     actor_rollout_ref.rollout.calculate_log_probs=True \
-    +algorithm.rollout_correction.bypass_mode=True \
+    algorithm.rollout_correction.bypass_mode=True \
     data.train_files="$train_files" \
     data.val_files="$test_files" \
     data.train_batch_size=$train_batch_size \
@@ -128,8 +146,7 @@ python3 -m verl.trainer.main_ppo \
     actor_rollout_ref.actor.ppo_mini_batch_size=$ppo_mini_batch_size \
     actor_rollout_ref.actor.ppo_micro_batch_size_per_gpu=$ppo_micro_batch_size_per_gpu \
     actor_rollout_ref.actor.ppo_epochs=$ppo_epochs \
-    actor_rollout_ref.actor.use_dynamic_bsz=True \
-    actor_rollout_ref.actor.ppo_max_token_len_per_gpu=$(((max_prompt_length + max_response_length) * 2)) \
+    actor_rollout_ref.actor.use_dynamic_bsz=False \
     actor_rollout_ref.actor.use_kl_loss=False \
     actor_rollout_ref.actor.entropy_coeff=0 \
     actor_rollout_ref.actor.clip_ratio=$CLIP_RATIO_LOW \

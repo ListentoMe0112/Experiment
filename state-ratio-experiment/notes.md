@@ -1022,11 +1022,154 @@ $$w_t = \prod_{j=\text{seg\_start}(t)}^{t} \rho_j$$
 
 LLM reasoning is often structured ("Step 1: ... Step 2: ..."). Cross-step prefix products may be less meaningful than within-step products. Requires a segmentation strategy (newlines, special tokens, or attention patterns).
 
-**6. Control variates** — Reduce variance by subtracting a correlated baseline:
+**6. Control variates (baseline subtraction)** — A variance reduction technique directly analogous to the advantage baseline in vanilla policy gradient. This deserves a detailed treatment because it is the **only** strategy in this list that is simultaneously *unbiased* and *variance-reducing*.
 
-$$\rho_{1:t}^{\text{cv}} = \rho_{1:t} - \alpha(b_t - \mathbb{E}[b_t])$$
+##### Motivation: The Analogy with Advantage
 
-A natural choice is $b_t = \rho_t$ (token-level ratio, with $\mathbb{E}_{\pi_\beta}[\rho_t] = 1$), using the token-level signal to "denoise" the prefix product.
+Recall how the advantage function solves the high-variance problem in REINFORCE:
+
+$$
+\nabla_\theta J(\theta) = \mathbb{E}\left[\sum_t \nabla_\theta \log \pi_\theta(a_t|s_t) \cdot Q^\pi(s_t, a_t)\right]
+$$
+
+Using $Q$ directly produces high-variance gradients. The fix is to subtract any **state-dependent** baseline $b(s_t)$:
+
+$$
+\nabla_\theta J(\theta) = \mathbb{E}\left[\sum_t \nabla_\theta \log \pi_\theta(a_t|s_t) \cdot (Q^\pi(s_t, a_t) - b(s_t))\right]
+$$
+
+This is unbiased by the **score function identity**:
+
+$$
+\mathbb{E}_{a_t \sim \pi_\theta(\cdot|s_t)}\left[\nabla_\theta \log \pi_\theta(a_t|s_t) \cdot b(s_t)\right]
+= b(s_t) \cdot \nabla_\theta \sum_a \pi_\theta(a|s_t) = b(s_t) \cdot \nabla_\theta 1 = 0
+$$
+
+The optimal $b(s_t) = V^\pi(s_t)$ yields the advantage $A(s_t, a_t) = Q - V$ — same gradient, strictly lower variance.
+
+**The key question:** can we play the same trick on the prefix importance ratio $\prod_{j=1}^{t} r_j$ to reduce its exponential variance without introducing bias?
+
+##### Structural Decomposition
+
+Notice that the full prefix product $w_t = \prod_{j=1}^{t} r_j$ splits cleanly into two parts:
+
+$$
+w_t = \underbrace{\prod_{j=1}^{t-1} r_j}_{\rho_{1:t-1}(s_t),\ \text{depends only on state } s_t} \cdot \underbrace{r_t}_{\text{depends on action } a_t}
+$$
+
+The prefix product $\rho_{1:t-1}$ is a function of the generated tokens $o_{<t}$, i.e. **purely a function of the state** $s_t = (q, o_{<t})$. This is exactly the structural condition needed to apply the baseline trick — but in the off-policy setting the score function identity requires a twist.
+
+##### The Off-Policy Score Function Identity
+
+In off-policy training, actions are sampled from $\pi_\beta$, not $\pi_\theta$. The naive baseline $b(s_t)$ is **no longer unbiased**:
+
+$$
+\mathbb{E}_{a_t \sim \pi_\beta}\left[\nabla_\theta \log \pi_\theta(a_t|s_t) \cdot b(s_t)\right]
+= b(s_t) \cdot \sum_a \pi_\beta(a|s_t) \cdot \frac{\nabla_\theta \pi_\theta(a|s_t)}{\pi_\theta(a|s_t)} \ne 0
+$$
+
+To fix this, multiply the baseline by $r_t$ (the action-level IS ratio):
+
+$$
+\mathbb{E}_{a_t \sim \pi_\beta}\left[r_t \cdot b(s_t) \cdot \nabla_\theta \log \pi_\theta(a_t|s_t)\right]
+= b(s_t) \cdot \sum_a \pi_\beta(a|s_t) \cdot \frac{\pi_\theta(a|s_t)}{\pi_\beta(a|s_t)} \cdot \frac{\nabla_\theta \pi_\theta(a|s_t)}{\pi_\theta(a|s_t)}
+= b(s_t) \cdot \nabla_\theta \sum_a \pi_\theta(a|s_t) = 0 \quad \checkmark
+$$
+
+So the **off-policy score function identity** is:
+
+$$
+\boxed{\mathbb{E}_{a_t \sim \pi_\beta}\left[r_t \cdot b(s_t) \cdot \nabla_\theta \log \pi_\theta(a_t|s_t)\right] = 0 \quad \text{for any } b(s_t)}
+$$
+
+##### The Unbiased, Variance-Reduced Prefix Correction
+
+Subtract an action-ratio-weighted baseline from the state-correction term:
+
+$$
+\nabla L_{SC}^{\text{CV}} = \mathbb{E}_{o \sim \pi_\beta}\left[\sum_t r_t \cdot \big(\rho_{1:t-1} - b(s_t)\big) \cdot \nabla_\theta \log \pi_\theta(a_t|s_t) \cdot \hat{A}_t\right]
+$$
+
+- **Unbiased**: the $r_t \cdot b(s_t)$ term vanishes in expectation by the identity above.
+- **Low variance**: if $b(s_t)$ approximates $\rho_{1:t-1}$ well, the effective weight $r_t \cdot (\rho_{1:t-1} - b(s_t))$ is small and well-behaved.
+- **No additional forward pass**: $b(s_t)$ is constructed from quantities already available in the batch.
+
+##### Practical Baseline Choices: The Dimension Matters
+
+Since $b(s_t)$ must depend only on $s_t$ (not on $a_t$ or future tokens), the **aggregation dimension** for computing $b(s_t)$ is not a free design choice — it is fixed by the unbiasedness condition.
+
+**Cross-sample (per-timestep) baselines** average over different rollouts at the *same* position $t$:
+
+$$
+b_t = \text{Agg}_{i \in \text{group/batch}}\left(\rho_{1:t-1}^{(i)}\right)
+$$
+
+This respects $s_t$-measurability: the baseline at position $t$ only sees information from $o_{<t}$ (the prefix).
+
+**Cross-position (per-sample) baselines** — averaging $\rho_{1:t'-1}$ over $t'$ within one sample — are **forbidden**: they would leak future actions $o_{t'}$ into $b(s_t)$ for $t < t'$, breaking the score function identity and introducing bias.
+
+So the choice narrows to: *what kind* of cross-sample aggregation, and *which* samples to aggregate over.
+
+**Additive vs Multiplicative Baselines.** Two structurally different forms:
+
+| Type | Formula for the effective weight | Property |
+|---|---|---|
+| **Additive CV** | $\tilde w_t = r_t \cdot (\rho_{1:t-1} - b_t)$ | Strictly unbiased via score function identity |
+| **Multiplicative rescale** (log-centering) | $\tilde w_t = r_t \cdot \rho_{1:t-1} / G_t$, $\;G_t = \exp(\overline{\log \rho_{1:t-1}})$ | Preserves gradient *direction* (same fixed points), **asymptotically** unbiased as $G_t \to 1$ |
+
+These are **not the same trick** — the additive form subtracts a baseline (classical control variate), the multiplicative form divides by a normalizing constant (closer to self-normalized IS). They combine well in practice.
+
+**Four concrete choices**, in increasing order of structural granularity:
+
+| Baseline | Formula | Dimension | Type |
+|---|---|---|---|
+| **Batch mean** | $b_t = \frac{1}{\|B\|}\sum_{i \in B} \rho_{1:t-1}^{(i)}$ | Across the whole mini-batch, per $t$ | Additive |
+| **Group mean** (GRPO-aware) | $b_t = \frac{1}{G}\sum_{i \in \text{group}(n)} \rho_{1:t-1}^{(i)}$ | Within each prompt's $G$ rollouts, per $t$ | Additive |
+| **Log-space group centering** ★ | $\log \tilde w_t = \log r_t + \big(\log \rho_{1:t-1} - \overline{\log \rho_{1:t-1}}^{\,\text{group}}\big)$ | Within each prompt's $G$ rollouts, per $t$ | Multiplicative (GeoMean) |
+| **EMA across training steps** | $b_t \leftarrow \alpha b_t^{\text{prev}} + (1-\alpha)\overline{\rho_{1:t-1}}$ | Across batches (temporal) | Additive |
+
+★ **Log-space group centering is the default choice in our implementation** (`SC_STRATEGY=baseline_corrected` in [state_corrected_loss.py](./state_corrected_loss.py)):
+1. It operates within each prompt's $G$ rollouts — aligned with GRPO's native group structure and providing the most relevant peer samples (they share the same initial state $s_0 = q$).
+2. It is multiplicative in the original space (divides by the geometric mean), which preserves the positive, ratio-like nature of $\rho_{1:t-1}$ and is robust to outliers (geometric mean is far less sensitive to extremes than arithmetic mean).
+3. It directly cancels the Jensen-induced drift $\mathbb{E}[\log \rho_{1:t-1}] \approx -(t-1)\cdot \bar D_{\text{KL}}$ that makes late-position tokens systematically under-weighted.
+
+##### What This Baseline Does — And Does Not — Fix
+
+Decompose the variance of $\log \rho_{1:t-1}$:
+
+$$
+\operatorname{Var}\big(\log \rho_{1:t-1}\big) = \underbrace{\operatorname{Var}_t\!\left[\mathbb{E}_i[\log \rho \mid t]\right]}_{\text{timestep drift}} + \underbrace{\mathbb{E}_t\!\left[\operatorname{Var}_i[\log \rho \mid t]\right]}_{\text{within-group spread}}
+$$
+
+Cross-group log-centering cancels the **first term** exactly (it subtracts the per-position group mean), but leaves the **second term** — the spread of individual samples around their group mean — completely untouched.
+
+The practical implication:
+
+- ✅ **Fixed**: systematic position-dependent scale shift. After centering, every timestep $t$ has expected weight $\approx 1$, so the effective learning rate no longer collapses on late tokens.
+- ❌ **Not fixed**: outlier rollouts whose $\rho_{1:t-1}$ deviates sharply from the group mean. Their centered weight can still be $10^2$ or $10^{-3}$, dominating the gradient.
+
+Therefore the baseline is **necessary but not sufficient**. The recommended pipeline is:
+
+```
+  log r_j   ───►   cumulative log ρ_{1:t-1}   ───►   group-mean subtract   ───►   clip(log w, log w_min, log w_max)   ───►   exp → w_t
+ (per token)        (exclusive prefix)            (drift correction)            (spread control)                      (final weight)
+```
+
+In code, steps 1–3 are performed inside `_compute_state_weight_baseline_corrected`, step 4 is the outer `SC_MIN_STATE_WEIGHT` / `SC_MAX_STATE_WEIGHT` clamp shared by all strategies. The `actor/log_state_weight_mean` and `actor/log_state_weight_std` metrics expose how tightly the centered distribution sits around zero.
+
+##### Connection to the Advantage Analogy
+
+The parallel is exact:
+
+| Quantity | REINFORCE | Off-policy SC |
+|---|---|---|
+| Raw weight | $Q(s_t, a_t)$ | $\rho_{1:t-1} \cdot r_t$ |
+| Baseline | $V(s_t)$ | $b(s_t) \cdot r_t$ |
+| Corrected weight | $A(s_t, a_t) = Q - V$ | $(\rho_{1:t-1} - b(s_t)) \cdot r_t$ |
+| Unbiased by | $\mathbb{E}_{\pi_\theta}[\nabla \log \pi_\theta] = 0$ | $\mathbb{E}_{\pi_\beta}[r_t \nabla \log \pi_\theta] = 0$ |
+| Variance reduced by | Removing state-dependent noise | Removing prefix-dependent noise |
+
+Just as Actor-Critic improves over REINFORCE by learning $V(s)$, an **Actor-Critic-style state correction** could improve over raw prefix IS by learning a baseline $\hat{b}_\phi(s_t) \approx \rho_{1:t-1}$ — e.g. a small MLP on hidden states, trained via regression. This is a natural direction not yet explored in the literature.
 
 #### The Full Spectrum
 
