@@ -24,6 +24,12 @@
 # =============================================================================
 set -xuo pipefail
 
+# ========================= Project Root & PYTHONPATH =========================
+# state_corrected_loss.py 放在项目根目录, verl external_lib 用 importlib 加载,
+# 必须把项目根放进 PYTHONPATH, Ray worker 才能 import.
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+export PYTHONPATH="${PROJECT_ROOT}:${PYTHONPATH:-}"
+
 # ========================= Output & Data Paths ===============================
 # OUTPUT_DIR must match the Docker volume mount (docker-run.sh: -v $HOME/output:/root/output)
 OUTPUT_DIR=${OUTPUT_DIR:-$HOME/output}
@@ -32,16 +38,18 @@ mkdir -p "$OUTPUT_DIR"
 # File logger: write jsonl logs under OUTPUT_DIR for persistent error capture
 export VERL_FILE_LOGGER_ROOT="$OUTPUT_DIR/logs"
 
-gsm8k_train_path=$HOME/data/gsm8k/train.parquet
-gsm8k_test_path=$HOME/data/gsm8k/test.parquet
-math_train_path=$HOME/data/math/train.parquet
-math_test_path=$HOME/data/math/test.parquet
+# 仅使用 MATH 数据集 (与 run_grpo.sh / run_grpo_tool.sh 路径约定一致: /nfs/datasets/math)
+DATASET_ROOT=${DATASET_ROOT:-/nfs/datasets}
+MATH_DIR=${MATH_DIR:-${DATASET_ROOT}/math}
+math_train_path=${MATH_DIR}/train.parquet
+math_test_path=${MATH_DIR}/test.parquet
 
-train_files="['$gsm8k_train_path', '$math_train_path']"
-test_files="['$gsm8k_test_path', '$math_test_path']"
+train_files="['$math_train_path']"
+test_files="['$math_test_path']"
 
 # ========================= Shared Hyperparameters ============================
-MODEL_PATH=${MODEL_PATH:-$HOME/models/Qwen2.5-1.5B-Instruct}
+MODEL_ROOT=${MODEL_ROOT:-/nfs/models}
+MODEL_PATH=${MODEL_PATH:-${MODEL_ROOT}/Qwen2.5-1.5B-Instruct}
 GPUS_PER_NODE=8
 NNODES=1
 
@@ -87,8 +95,12 @@ MAX_STATE_WEIGHT=${MAX_STATE_WEIGHT:-5.0}
 MIN_STATE_WEIGHT=${MIN_STATE_WEIGHT:-0.2}
 
 # PPO clip ratios (asymmetric: wider for exploration)
+# NOTE: state_corrected_grpo loss 读的是 SC_PPO_CLIP_EPSILON, 不走 verl 的 clip_ratio.
+# 这里保留 CLIP_RATIO_LOW/HIGH 主要是为了下面给 verl 的 clip_ratio 参数填一个合法值,
+# 真正对 action ratio r_t 生效的是 SC_PPO_CLIP_EPSILON.
 CLIP_RATIO_LOW=${CLIP_RATIO_LOW:-0.2}
 CLIP_RATIO_HIGH=${CLIP_RATIO_HIGH:-0.28}
+SC_PPO_CLIP_EPSILON=${SC_PPO_CLIP_EPSILON:-$CLIP_RATIO_LOW}
 
 # ========================= Run ===============================================
 # Export state correction hyperparameters as environment variables
@@ -99,6 +111,7 @@ export SC_EMA_ALPHA=$EMA_ALPHA
 export SC_GROUP_SIZE=$SC_GROUP_SIZE
 export SC_MAX_STATE_WEIGHT=$MAX_STATE_WEIGHT
 export SC_MIN_STATE_WEIGHT=$MIN_STATE_WEIGHT
+export SC_PPO_CLIP_EPSILON=$SC_PPO_CLIP_EPSILON
 
 # Sanity check: baseline_corrected requires group_size == rollout.n
 if [ "$SC_STRATEGY" = "baseline_corrected" ] && [ "$SC_GROUP_SIZE" != "$n_resp_per_prompt" ]; then
@@ -119,7 +132,12 @@ else
     EXP_NAME="sc_${SC_STRATEGY}_qwen2.5_1.5b"
 fi
 
-# Verify the custom loss module is importable
+# 预检: 数据集 / 模型 / 自定义 loss 模块是否可导入
+test -f "${math_train_path}" || { echo "ERR: train parquet not found: ${math_train_path}"; exit 1; }
+test -f "${math_test_path}"  || { echo "ERR: test  parquet not found: ${math_test_path}";  exit 1; }
+test -d "${MODEL_PATH}" || { echo "ERR: MODEL_PATH='${MODEL_PATH}' 不存在或不是目录."; exit 1; }
+test -f "${MODEL_PATH}/config.json" || { echo "ERR: ${MODEL_PATH}/config.json 不存在, 模型未就绪"; exit 1; }
+
 python3 -c "import state_corrected_loss; print('Registered state_corrected_grpo loss')" || {
     echo 'ERROR: Cannot import state_corrected_loss.py. Make sure it is in PYTHONPATH or cwd.'
     exit 1
@@ -169,6 +187,15 @@ python3 -m verl.trainer.main_ppo \
     actor_rollout_ref.rollout.temperature=$temperature \
     actor_rollout_ref.rollout.top_p=$top_p \
     algorithm.use_kl_in_reward=False \
+    +ray_kwargs.ray_init.runtime_env.env_vars.PYTHONPATH="${PROJECT_ROOT}" \
+    +ray_kwargs.ray_init.runtime_env.env_vars.SC_STRATEGY="${SC_STRATEGY}" \
+    +ray_kwargs.ray_init.runtime_env.env_vars.SC_LOOKBACK_K="${SC_LOOKBACK_K}" \
+    +ray_kwargs.ray_init.runtime_env.env_vars.SC_VTRACE_C="${SC_VTRACE_C}" \
+    +ray_kwargs.ray_init.runtime_env.env_vars.SC_EMA_ALPHA="${SC_EMA_ALPHA}" \
+    +ray_kwargs.ray_init.runtime_env.env_vars.SC_GROUP_SIZE="${SC_GROUP_SIZE}" \
+    +ray_kwargs.ray_init.runtime_env.env_vars.SC_MAX_STATE_WEIGHT="${SC_MAX_STATE_WEIGHT}" \
+    +ray_kwargs.ray_init.runtime_env.env_vars.SC_MIN_STATE_WEIGHT="${SC_MIN_STATE_WEIGHT}" \
+    +ray_kwargs.ray_init.runtime_env.env_vars.SC_PPO_CLIP_EPSILON="${SC_PPO_CLIP_EPSILON}" \
     trainer.critic_warmup=0 \
     trainer.logger='["console","file"]' \
     trainer.project_name='state_ratio_experiment' \

@@ -177,24 +177,31 @@ def _compute_state_weight_min_prefix(
     Uses the minimum token ratio up to but NOT including current token as a
     stable, non-cumulative surrogate for the exclusive prefix product.
 
+    Implementation: single-kernel ``torch.cummin`` + left-shift, replacing
+    the previous O(T)-kernel Python loop that caused the training slowdown
+    and autograd-graph bloat on long responses (T = max_response_length).
+
     Returns log(min_{j<t} r_j) for numerical stability.
     """
     B, T = log_ratio.shape
 
-    # Replace masked positions with +inf so they don't affect the min
-    large_val = torch.tensor(1e9, device=log_ratio.device, dtype=log_ratio.dtype)
-    masked_log_ratio = torch.where(response_mask.bool(), log_ratio, large_val)
+    # Replace masked positions with +inf so they don't contribute to the running min.
+    # No grad needed: final log_state_weight is detached before it reaches the loss.
+    with torch.no_grad():
+        large_val = torch.tensor(1e9, device=log_ratio.device, dtype=log_ratio.dtype)
+        masked_log_ratio = torch.where(response_mask.bool(), log_ratio, large_val)
 
-    # Compute running min of log_ratio for positions j < t (excluding current)
-    # cummin_vals[t] = min(log_ratio[0], ..., log_ratio[t-1])
-    # For t=0, use a large value (no valid j < 0)
-    cummin_vals = torch.full_like(log_ratio, large_val)
-    for t in range(1, T):
-        cummin_vals[:, t] = torch.min(cummin_vals[:, t-1], masked_log_ratio[:, t-1])
-    
-    # For t=0, set to 0 (log(1) = 0 for empty product)
-    cummin_vals[:, 0] = 0.0
-    
+        # INCLUSIVE cummin:  inclusive[t] = min(log_ratio[0], ..., log_ratio[t])
+        # Then shift right by 1 to get EXCLUSIVE cummin:
+        #   exclusive[t] = min(log_ratio[0], ..., log_ratio[t-1])   for t >= 1
+        #   exclusive[0] = 0  (empty product, log(1) = 0)
+        inclusive, _ = torch.cummin(masked_log_ratio, dim=-1)
+
+        cummin_vals = torch.empty_like(log_ratio)
+        cummin_vals[:, 0] = 0.0
+        if T > 1:
+            cummin_vals[:, 1:] = inclusive[:, :-1]
+
     return cummin_vals
 
 

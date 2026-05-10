@@ -13,18 +13,26 @@ mkdir -p "$OUTPUT_DIR"
 # File logger: write jsonl logs under OUTPUT_DIR for persistent error capture
 export VERL_FILE_LOGGER_ROOT="$OUTPUT_DIR/logs"
 
-gsm8k_train_path=$HOME/data/gsm8k/train.parquet
-gsm8k_test_path=$HOME/data/gsm8k/test.parquet
-math_train_path=$HOME/data/math/train.parquet
-math_test_path=$HOME/data/math/test.parquet
+# 仅使用 MATH 数据集 (与 run_grpo.sh / run_state_corrected.sh 路径约定一致: /nfs/datasets/math)
+DATASET_ROOT=${DATASET_ROOT:-/nfs/datasets}
+MATH_DIR=${MATH_DIR:-${DATASET_ROOT}/math}
+math_train_path=${MATH_DIR}/train.parquet
+math_test_path=${MATH_DIR}/test.parquet
 
-train_files="['$gsm8k_train_path', '$math_train_path']"
-test_files="['$gsm8k_test_path', '$math_test_path']"
+train_files="['$math_train_path']"
+test_files="['$math_test_path']"
 
 # ========================= Shared Hyperparameters ============================
-MODEL_PATH=${MODEL_PATH:-$HOME/models/Qwen2.5-1.5B-Instruct}
+MODEL_ROOT=${MODEL_ROOT:-/nfs/models}
+MODEL_PATH=${MODEL_PATH:-${MODEL_ROOT}/Qwen2.5-1.5B-Instruct}
 GPUS_PER_NODE=8
 NNODES=1
+
+# 预检: 数据集 / 模型
+test -f "${math_train_path}" || { echo "ERR: train parquet not found: ${math_train_path}"; exit 1; }
+test -f "${math_test_path}"  || { echo "ERR: test  parquet not found: ${math_test_path}";  exit 1; }
+test -d "${MODEL_PATH}" || { echo "ERR: MODEL_PATH='${MODEL_PATH}' 不存在或不是目录."; exit 1; }
+test -f "${MODEL_PATH}/config.json" || { echo "ERR: ${MODEL_PATH}/config.json 不存在, 模型未就绪"; exit 1; }
 
 # Training (8× H100 80GB) - Optimized for 1.5B model
 train_batch_size=1024
