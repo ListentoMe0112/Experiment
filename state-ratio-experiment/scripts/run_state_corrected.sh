@@ -27,7 +27,10 @@ set -xuo pipefail
 # ========================= Project Root & PYTHONPATH =========================
 # state_corrected_loss.py 放在项目根目录, verl external_lib 用 importlib 加载,
 # 必须把项目根放进 PYTHONPATH, Ray worker 才能 import.
-PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+# NOTE: 这个脚本本身就放在项目根目录 (/workspace/verl/run_state_corrected.sh),
+#       所以 PROJECT_ROOT 就是脚本所在目录, 不要用 ../..
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "${PROJECT_ROOT}"
 export PYTHONPATH="${PROJECT_ROOT}:${PYTHONPATH:-}"
 
 # ========================= Output & Data Paths ===============================
@@ -61,7 +64,7 @@ max_prompt_length=1024
 max_response_length=2048
 n_resp_per_prompt=8
 ppo_epochs=4              # offline updates per rollout batch
-total_epochs=15
+total_epochs=30
 lr=2e-6
 
 # Rollout
@@ -75,24 +78,14 @@ top_p=1.0
 #         | baseline_corrected | none | identity
 SC_STRATEGY=${SC_STRATEGY:-truncated_window}
 
-# For truncated_window: lookback window k
-# k=0 → no state correction, k=5 → moderate, k=-1 → full trajectory
-LOOKBACK_K=${LOOKBACK_K:-5}
-
-# For vtrace: truncation threshold c̄
-VTRACE_C=${VTRACE_C:-1.0}
-
-# For log_ema: smoothing factor α
-EMA_ALPHA=${EMA_ALPHA:-0.9}
-
 # For baseline_corrected: group size (number of rollouts per prompt).
 # MUST equal actor_rollout_ref.rollout.n so the (B, T) batch reshapes cleanly
 # into (num_prompts, G, T) for per-prompt geometric centering of ρ_{1:t-1}.
 SC_GROUP_SIZE=${SC_GROUP_SIZE:-$n_resp_per_prompt}
 
 # Weight clipping bounds
-MAX_STATE_WEIGHT=${MAX_STATE_WEIGHT:-5.0}
-MIN_STATE_WEIGHT=${MIN_STATE_WEIGHT:-0.2}
+MAX_STATE_WEIGHT=${MAX_STATE_WEIGHT:-100000}
+MIN_STATE_WEIGHT=${MIN_STATE_WEIGHT:-0.00001}
 
 # PPO clip ratios (asymmetric: wider for exploration)
 # NOTE: state_corrected_grpo loss 读的是 SC_PPO_CLIP_EPSILON, 不走 verl 的 clip_ratio.
@@ -103,11 +96,14 @@ CLIP_RATIO_HIGH=${CLIP_RATIO_HIGH:-0.28}
 SC_PPO_CLIP_EPSILON=${SC_PPO_CLIP_EPSILON:-$CLIP_RATIO_LOW}
 
 # ========================= Run ===============================================
-# Export state correction hyperparameters as environment variables
+# Export state correction hyperparameters as environment variables.
+# LOOKBACK_K / VTRACE_C / EMA_ALPHA 只在对应策略下被 loss 读到, 其它策略 (none /
+# identity / baseline_corrected / ...) 下可以为空. 在这里统一给默认值, 避免 `set -u`
+# 报 "unbound variable".
 export SC_STRATEGY=$SC_STRATEGY
-export SC_LOOKBACK_K=$LOOKBACK_K
-export SC_VTRACE_C=$VTRACE_C
-export SC_EMA_ALPHA=$EMA_ALPHA
+export SC_LOOKBACK_K=${LOOKBACK_K:-5}
+export SC_VTRACE_C=${VTRACE_C:-1.0}
+export SC_EMA_ALPHA=${EMA_ALPHA:-0.9}
 export SC_GROUP_SIZE=$SC_GROUP_SIZE
 export SC_MAX_STATE_WEIGHT=$MAX_STATE_WEIGHT
 export SC_MIN_STATE_WEIGHT=$MIN_STATE_WEIGHT
@@ -127,9 +123,9 @@ elif [ "$SC_STRATEGY" = "vtrace" ]; then
 elif [ "$SC_STRATEGY" = "log_ema" ]; then
     EXP_NAME="sc_${SC_STRATEGY}_a${EMA_ALPHA}_qwen2.5_1.5b"
 elif [ "$SC_STRATEGY" = "baseline_corrected" ]; then
-    EXP_NAME="sc_${SC_STRATEGY}_g${SC_GROUP_SIZE}_qwen2.5_1.5b"
+    EXP_NAME="sc_${SC_STRATEGY}_g${SC_GROUP_SIZE}_${MAX_STATE_WEIGHT}_qwen2.5_1.5b"
 else
-    EXP_NAME="sc_${SC_STRATEGY}_qwen2.5_1.5b"
+    EXP_NAME="sc_${SC_STRATEGY}_${MAX_STATE_WEIGHT}_qwen2.5_1.5b"
 fi
 
 # 预检: 数据集 / 模型 / 自定义 loss 模块是否可导入
@@ -175,7 +171,7 @@ python3 -m verl.trainer.main_ppo \
     actor_rollout_ref.actor.fsdp_config.param_offload=False \
     actor_rollout_ref.actor.fsdp_config.optimizer_offload=False \
     actor_rollout_ref.rollout.log_prob_micro_batch_size_per_gpu=16 \
-    actor_rollout_ref.rollout.log_prob_use_dynamic_bsz=True \
+    actor_rollout_ref.rollout.log_prob_use_dynamic_bsz=False \
     actor_rollout_ref.rollout.log_prob_max_token_len_per_gpu=$(((max_prompt_length + max_response_length) * 3)) \
     actor_rollout_ref.rollout.tensor_model_parallel_size=$rollout_tp \
     actor_rollout_ref.rollout.name=vllm \
@@ -187,15 +183,15 @@ python3 -m verl.trainer.main_ppo \
     actor_rollout_ref.rollout.temperature=$temperature \
     actor_rollout_ref.rollout.top_p=$top_p \
     algorithm.use_kl_in_reward=False \
-    +ray_kwargs.ray_init.runtime_env.env_vars.PYTHONPATH="${PROJECT_ROOT}" \
-    +ray_kwargs.ray_init.runtime_env.env_vars.SC_STRATEGY="${SC_STRATEGY}" \
-    +ray_kwargs.ray_init.runtime_env.env_vars.SC_LOOKBACK_K="${SC_LOOKBACK_K}" \
-    +ray_kwargs.ray_init.runtime_env.env_vars.SC_VTRACE_C="${SC_VTRACE_C}" \
-    +ray_kwargs.ray_init.runtime_env.env_vars.SC_EMA_ALPHA="${SC_EMA_ALPHA}" \
-    +ray_kwargs.ray_init.runtime_env.env_vars.SC_GROUP_SIZE="${SC_GROUP_SIZE}" \
-    +ray_kwargs.ray_init.runtime_env.env_vars.SC_MAX_STATE_WEIGHT="${SC_MAX_STATE_WEIGHT}" \
-    +ray_kwargs.ray_init.runtime_env.env_vars.SC_MIN_STATE_WEIGHT="${SC_MIN_STATE_WEIGHT}" \
-    +ray_kwargs.ray_init.runtime_env.env_vars.SC_PPO_CLIP_EPSILON="${SC_PPO_CLIP_EPSILON}" \
+    +ray_kwargs.ray_init.runtime_env.env_vars.PYTHONPATH=\""${PROJECT_ROOT}"\" \
+    +ray_kwargs.ray_init.runtime_env.env_vars.SC_STRATEGY=\""${SC_STRATEGY}"\" \
+    +ray_kwargs.ray_init.runtime_env.env_vars.SC_LOOKBACK_K=\""${SC_LOOKBACK_K}"\" \
+    +ray_kwargs.ray_init.runtime_env.env_vars.SC_VTRACE_C=\""${SC_VTRACE_C}"\" \
+    +ray_kwargs.ray_init.runtime_env.env_vars.SC_EMA_ALPHA=\""${SC_EMA_ALPHA}"\" \
+    +ray_kwargs.ray_init.runtime_env.env_vars.SC_GROUP_SIZE=\""${SC_GROUP_SIZE}"\" \
+    +ray_kwargs.ray_init.runtime_env.env_vars.SC_MAX_STATE_WEIGHT=\""${SC_MAX_STATE_WEIGHT}"\" \
+    +ray_kwargs.ray_init.runtime_env.env_vars.SC_MIN_STATE_WEIGHT=\""${SC_MIN_STATE_WEIGHT}"\" \
+    +ray_kwargs.ray_init.runtime_env.env_vars.SC_PPO_CLIP_EPSILON=\""${SC_PPO_CLIP_EPSILON}"\" \
     trainer.critic_warmup=0 \
     trainer.logger='["console","file"]' \
     trainer.project_name='state_ratio_experiment' \

@@ -4,8 +4,8 @@
 Compare PPO clip / SC clamp / joint-excluded fractions across the runs:
   - GRPO baseline         (verl logs `actor/pg_clipfrac`, `actor/pg_clipfrac_lower`)
   - GSPO baseline         (same clip metrics as GRPO; sequence-level ratio)
-  - SC (none)             (logs both `ppo_clip_*` and `state_weight_clamp_*`)
-  - SC (baseline_corrected / min_prefix / identity)
+  - SC-mask             (logs both `ppo_clip_*` and `state_weight_clamp_*`)
+  - SC (min_prefix / identity)
 
 Layout (2 x 3):
   Row 1
@@ -36,24 +36,23 @@ RESULTS_DIR = Path(__file__).resolve().parent
 RUNS = {
     "GRPO baseline": RESULTS_DIR / "grpo_baseline_qwen2.5_1.5b.jsonl",
     "GSPO baseline": RESULTS_DIR / "gspo_baseline_qwen2.5_1.5b.jsonl",
-    "SC (none)_clamp2": RESULTS_DIR / "sc_none_qwen2.5_1.5b_clamp2.jsonl",
-    "SC (none)_clamp4": RESULTS_DIR / "sc_none_qwen2.5_1.5b_clamp4.jsonl",
-    "SC (baseline_corrected, G=8)":
-        RESULTS_DIR / "sc_baseline_corrected_g8_qwen2.5_1.5b.jsonl",
-    "SC (min_prefix)":
+    "SC-mask (c=2)": RESULTS_DIR / "sc_none_qwen2.5_1.5b_clamp2.jsonl",
+    "SC-mask (c=4)": RESULTS_DIR / "sc_none_qwen2.5_1.5b_clamp4.jsonl",
+    "SC-mask (c=1e5)": RESULTS_DIR / "sc_none_qwen2.5_1.5b_clamp100000.jsonl",
+    "SC-min-prefix":
         RESULTS_DIR / "sc_min_prefix_qwen2.5_1.5b.jsonl",
-    "SC (identity)":
+    "SC-identity":
         RESULTS_DIR / "sc_identity_qwen2.5_1.5b.jsonl",
 }
 
 COLORS = {
     "GRPO baseline":                "#1f77b4",
     "GSPO baseline":                "#17becf",
-    "SC (none)_clamp2":             "#d62728",
-    "SC (none)_clamp4":             "#e377c2",
-    "SC (baseline_corrected, G=8)": "#2ca02c",
-    "SC (min_prefix)":              "#ff7f0e",
-    "SC (identity)":                "#9467bd",
+    "SC-mask (c=2)":             "#d62728",
+    "SC-mask (c=4)":             "#e377c2",
+    "SC-mask (c=1e5)":           "#8b1a1a",
+    "SC-min-prefix":              "#ff7f0e",
+    "SC-identity":                "#9467bd",
 }
 
 # All metric keys we may look up (missing keys are just skipped per-run).
@@ -152,11 +151,11 @@ def main():
         {
             "GRPO baseline":                "actor/pg_clipfrac",
             "GSPO baseline":                "actor/pg_clipfrac",
-            "SC (none)_clamp2":             "actor/joint_excluded_frac",
-            "SC (none)_clamp4":             "actor/joint_excluded_frac",
-            "SC (baseline_corrected, G=8)": "actor/joint_excluded_frac",
-            "SC (min_prefix)":              "actor/joint_excluded_frac",
-            "SC (identity)":                "actor/joint_excluded_frac",
+            "SC-mask (c=2)":             "actor/joint_excluded_frac",
+            "SC-mask (c=4)":             "actor/joint_excluded_frac",
+            "SC-mask (c=1e5)":             "actor/joint_excluded_frac",
+            "SC-min-prefix":              "actor/joint_excluded_frac",
+            "SC-identity":                "actor/joint_excluded_frac",
         },
         title="Total excluded fraction  (PPO clip ∪ SC clamp)",
     )
@@ -167,11 +166,11 @@ def main():
         {
             "GRPO baseline":                "actor/pg_clipfrac",
             "GSPO baseline":                "actor/pg_clipfrac",
-            "SC (none)_clamp2":             "actor/ppo_clip_frac",
-            "SC (none)_clamp4":             "actor/ppo_clip_frac",
-            "SC (baseline_corrected, G=8)": "actor/ppo_clip_frac",
-            "SC (min_prefix)":              "actor/ppo_clip_frac",
-            "SC (identity)":                "actor/ppo_clip_frac",
+            "SC-mask (c=2)":             "actor/ppo_clip_frac",
+            "SC-mask (c=4)":             "actor/ppo_clip_frac",
+            "SC-mask (c=1e5)":             "actor/ppo_clip_frac",
+            "SC-min-prefix":              "actor/ppo_clip_frac",
+            "SC-identity":                "actor/ppo_clip_frac",
         },
         title="PPO clip fraction  (total)",
     )
@@ -180,11 +179,11 @@ def main():
     plot_metric(
         axes[2], runs_data,
         {
-            "SC (none)_clamp2":             "actor/state_weight_clamp_frac",
-            "SC (none)_clamp4":             "actor/state_weight_clamp_frac",
-            "SC (baseline_corrected, G=8)": "actor/state_weight_clamp_frac",
-            "SC (min_prefix)":              "actor/state_weight_clamp_frac",
-            "SC (identity)":                "actor/state_weight_clamp_frac",
+            "SC-mask (c=2)":             "actor/state_weight_clamp_frac",
+            "SC-mask (c=4)":             "actor/state_weight_clamp_frac",
+            "SC-mask (c=1e5)":             "actor/state_weight_clamp_frac",
+            "SC-min-prefix":              "actor/state_weight_clamp_frac",
+            "SC-identity":                "actor/state_weight_clamp_frac",
         },
         title="SC state-weight clamp fraction  (total)",
     )
@@ -207,7 +206,7 @@ def main():
             ax.plot(xs_tot, smooth(ys_upper, k=5),
                     color=COLORS[bname], linewidth=2,
                     label=f"{bname}  (= total − lower)")
-    for name in ["SC (none)_clamp2", "SC (none)_clamp4", "SC (baseline_corrected, G=8)", "SC (min_prefix)", "SC (identity)"]:
+    for name in ["SC-mask (c=2)", "SC-mask (c=4)", "SC-mask (c=1e5)", "SC-min-prefix", "SC-identity"]:
         xs, ys = runs_data[name].get("actor/ppo_clip_upper_frac", ([], []))
         if ys:
             ax.plot(xs, ys, color=COLORS[name], alpha=0.20, linewidth=1)
@@ -223,18 +222,18 @@ def main():
         {
             "GRPO baseline":                "actor/pg_clipfrac_lower",
             "GSPO baseline":                "actor/pg_clipfrac_lower",
-            "SC (none)_clamp2":             "actor/ppo_clip_lower_frac",
-            "SC (none)_clamp4":             "actor/ppo_clip_lower_frac",
-            "SC (baseline_corrected, G=8)": "actor/ppo_clip_lower_frac",
-            "SC (min_prefix)":              "actor/ppo_clip_lower_frac",
-            "SC (identity)":                "actor/ppo_clip_lower_frac",
+            "SC-mask (c=2)":             "actor/ppo_clip_lower_frac",
+            "SC-mask (c=4)":             "actor/ppo_clip_lower_frac",
+            "SC-mask (c=1e5)":             "actor/ppo_clip_lower_frac",
+            "SC-min-prefix":              "actor/ppo_clip_lower_frac",
+            "SC-identity":                "actor/ppo_clip_lower_frac",
         },
         title="PPO clip — lower  (r < 1−ε, negative adv)",
     )
 
     # --- [5] SC clamp — upper / lower (SC runs only) ----------------------
     ax = axes[5]
-    for name in ["SC (none)_clamp2", "SC (none)_clamp4", "SC (baseline_corrected, G=8)", "SC (min_prefix)", "SC (identity)"]:
+    for name in ["SC-mask (c=2)", "SC-mask (c=4)", "SC-mask (c=1e5)", "SC-min-prefix", "SC-identity"]:
         bkt = runs_data[name]
         xs_up, ys_up = bkt.get("actor/state_weight_clamp_upper_frac", ([], []))
         xs_lo, ys_lo = bkt.get("actor/state_weight_clamp_lower_frac", ([], []))
@@ -249,7 +248,7 @@ def main():
     ax.grid(True, alpha=0.3); ax.legend(fontsize=8)
 
     fig.suptitle(
-        "Clip & clamp fractions  —  GRPO / GSPO baselines vs SC(none / baseline_corrected / min_prefix / identity)",
+        "Clip & clamp fractions  —  GRPO / GSPO baselines vs SC-mask / SC-min-prefix / SC-identity",
         fontsize=13, fontweight="bold",
     )
     fig.tight_layout(rect=[0, 0, 1, 0.96])

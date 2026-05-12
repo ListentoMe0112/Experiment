@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.29 (TeX Live 2026) (preloaded format=pdflatex 2026.5.5)  10 MAY 2026 18:09
+This is pdfTeX, Version 3.141592653-2.6-1.40.29 (TeX Live 2026) (preloaded format=pdflatex 2026.5.5)  11 MAY 2026 22:30
 entering extended mode
  restricted \write18 enabled.
  file:line:error style messages enabled.
@@ -644,43 +644,54 @@ LaTeX Font Info:    External font `lmex10' loaded for size
 (Font)              <7> on input line 80.
  [1
 
-{/usr/local/texlive/2026/texmf-var/fonts/map/pdftex/updmap/pdftex.map}{/usr/local/texlive/2026/texmf-dist/fonts/enc/dvips/lm/lm-ec.enc}{/usr/local/texlive/2026/texmf-dist/fonts/enc/dvips/lm/lm-mathit.enc}{/usr/local/texlive/2026/texmf-dist/fonts/enc/dvips/lm/lm-rm.enc}{/usr/local/texlive/2026/texmf-dist/fonts/enc/dvips/lm/lm-mathsy.enc}{/usr/local/texlive/2026/texmf-dist/fonts/enc/dvips/lm/lm-mathex.enc}] [2] [3]
+{/usr/local/texlive/2026/texmf-var/fonts/map/pdftex/updmap/pdftex.map}{/usr/local/texlive/2026/texmf-dist/fonts/enc/dvips/lm/lm-ec.enc}{/usr/local/texlive/2026/texmf-dist/fonts/enc/dvips/lm/lm-mathit.enc}{/usr/local/texlive/2026/texmf-dist/fonts/enc/dvips/lm/lm-rm.enc}{/usr/local/texlive/2026/texmf-dist/fonts/enc/dvips/lm/lm-mathsy.enc}{/usr/local/texlive/2026/texmf-dist/fonts/enc/dvips/lm/lm-mathex.enc}] [2]
 LaTeX Font Info:    External font `lmex10' loaded for size
-(Font)              <9> on input line 289.
-LaTeX Font Info:    Trying to load font information for TS1+lmr on input line 289.
+(Font)              <9> on input line 246.
+LaTeX Font Info:    External font `lmex10' loaded for size
+(Font)              <5> on input line 246.
+LaTeX Font Info:    Trying to load font information for TS1+lmr on input line 246.
  (/usr/local/texlive/2026/texmf-dist/tex/latex/lm/ts1lmr.fd
 File: ts1lmr.fd 2015/05/01 v1.6.1 Font defs for Latin Modern
-)
-LaTeX Font Info:    Font shape `T1/lmtt/bx/n' in size <9> not available
-(Font)              Font shape `T1/lmtt/b/n' tried instead on input line 289.
+) [3]
 LaTeX Font Info:    Font shape `T1/lmtt/bx/n' in size <10.95> not available
+(Font)              Font shape `T1/lmtt/b/n' tried instead on input line 252.
+LaTeX Font Info:    Font shape `T1/lmtt/bx/n' in size <12> not available
 (Font)              Font shape `T1/lmtt/b/n' tried instead on input line 295.
- [4{/usr/local/texlive/2026/texmf-dist/fonts/enc/dvips/lm/lm-ts1.enc}]
-Overfull \hbox (30.04027pt too wide) in paragraph at lines 347--348
-[]\T1/lmr/bx/it/10.95 (-20) On-policy con-sis-tency. \T1/lmr/m/it/10.95 (-20) If $\OML/lmm/m/it/10.95 ^^Y[] \OT1/lmr/m/n/10.95 (-20) = \OML/lmm/m/it/10.95 ^^Y[]$\T1/lmr/m/it/10.95 (-20) , then $\OML/lmm/m/it/10.95 w[] \OMS/lmsy/m/n/10.95 ^^A \OML/lmm/m/it/10.95 r[] \OMS/lmsy/m/n/10.95 ^^Q \OT1/lmr/m/n/10.95 (-20) 1$ \T1/lmr/m/it/10.95 (-20) al-most surely, and the SC \T1/lmtt/m/it/10.95 baseline_corrected
+ [4{/usr/local/texlive/2026/texmf-dist/fonts/enc/dvips/lm/lm-ts1.enc}] [5]
+Overfull \hbox (12.67065pt too wide) in paragraph at lines 351--351
+\T1/lmtt/m/n/10 state_corrected_loss.py|  
  []
 
-[5] [6] [7]
-<../../results/comparison.png, id=112, 1156.32pt x 650.43pt>
+
+Overfull \hbox (189.592pt too wide) in paragraph at lines 355--356
+[]\T1/lmr/bx/n/10.95 (-20) On the GSPO base-line. \T1/lmr/m/n/10.95 (-20) GSPO's loss is the one built into \T1/lmtt/m/n/10.95 verl \T1/lmr/m/n/10.95 (-20) via \T1/lmtt/m/n/10.95 actor_rollout_ref.actor.policy_loss.loss_mode=gspo\T1/lmr/m/n/10.95 (-20) ;
+ []
+
+[6]
+<../../results/comparison.png, id=83, 1156.32pt x 650.43pt>
 File: ../../results/comparison.png Graphic file (type png)
 <use ../../results/comparison.png>
-Package pdftex.def Info: ../../results/comparison.png  used on input line 520.
+Package pdftex.def Info: ../../results/comparison.png  used on input line 411.
 (pdftex.def)             Requested size: 448.6987pt x 252.38638pt.
- [8 <../../results/comparison.png>]
-<../../results/comparison_clip_clamp.png, id=128, 1228.59pt x 650.43pt>
+ [7]
+<../../results/comparison_clip_clamp.png, id=98, 1228.59pt x 650.43pt>
 File: ../../results/comparison_clip_clamp.png Graphic file (type png)
 <use ../../results/comparison_clip_clamp.png>
-Package pdftex.def Info: ../../results/comparison_clip_clamp.png  used on input line 539.
+Package pdftex.def Info: ../../results/comparison_clip_clamp.png  used on input line 430.
 (pdftex.def)             Requested size: 448.6987pt x 237.54887pt.
- [9 <../../results/comparison_clip_clamp.png>]
-LaTeX Font Info:    Font shape `T1/lmtt/bx/n' in size <12> not available
-(Font)              Font shape `T1/lmtt/b/n' tried instead on input line 574.
+ [8 <../../results/comparison.png>]
 LaTeX Font Info:    External font `lmex10' loaded for size
-(Font)              <12> on input line 578.
- [10]
+(Font)              <12> on input line 459.
+ [9 <../../results/comparison_clip_clamp.png>]
+<../../results/comparison_off_policy_drift.png, id=119, 1011.78pt x 578.16pt>
+File: ../../results/comparison_off_policy_drift.png Graphic file (type png)
+<use ../../results/comparison_off_policy_drift.png>
+Package pdftex.def Info: ../../results/comparison_off_policy_drift.png  used on input line 465.
+(pdftex.def)             Requested size: 448.6987pt x 256.4026pt.
+ [10 <../../results/comparison_off_policy_drift.png>] [11]
 LaTeX Font Info:    Font shape `T1/lmtt/bx/n' in size <8> not available
-(Font)              Font shape `T1/lmtt/b/n' tried instead on input line 644.
- [11] [12] [13] [14] (./paper_draft.aux)
+(Font)              Font shape `T1/lmtt/b/n' tried instead on input line 581.
+ [12] [13] [14] [15] (./paper_draft.aux)
  ***********
 LaTeX2e <2025-11-01>
 L3 programming layer <2026-03-20>
@@ -689,18 +700,18 @@ Package rerunfilecheck Info: File `paper_draft.out' has not changed.
 (rerunfilecheck)             Checksum: D41D8CD98F00B204E9800998ECF8427E;0.
  ) 
 Here is how much of TeX's memory you used:
- 18334 strings out of 468594
- 290427 string characters out of 5442247
- 769824 words of memory out of 5000000
- 46566 multiletter control sequences out of 15000+600000
- 780663 words of font info for 307 fonts, out of 8000000 for 9000
+ 18392 strings out of 468594
+ 291397 string characters out of 5442247
+ 794447 words of memory out of 5000000
+ 46571 multiletter control sequences out of 15000+600000
+ 808450 words of font info for 340 fonts, out of 8000000 for 9000
  384 hyphenation exceptions out of 8191
- 75i,16n,79p,1282b,1163s stack positions out of 10000i,1000n,20000p,200000b,200000s
+ 75i,15n,79p,1436b,1162s stack positions out of 10000i,1000n,20000p,200000b,200000s
 </usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmbx10.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmbx12.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmbx7.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmbx8.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmbx9.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmbxi10.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmex10.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmmi10.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmmi12.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmmi5.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmmi6.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmmi7.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmmi8.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmmi9.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmr10.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmr12.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmr6.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmr7.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmr8.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmr9.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmri10.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmsy10.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmsy6.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmsy7.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmsy8.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmsy9.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmtk10.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmtt10.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/lm/lmtti10.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/amsfonts/symbols/msam10.pfb></usr/local/texlive/2026/texmf-dist/fonts/type1/public/amsfonts/symbols/msbm10.pfb>
-Output written on paper_draft.pdf (14 pages, 1474167 bytes).
+Output written on paper_draft.pdf (15 pages, 1779040 bytes).
 PDF statistics:
- 352 PDF objects out of 1000 (max. 8388607)
- 259 compressed objects within 3 object streams
- 71 named destinations out of 1000 (max. 500000)
- 89611 words of extra memory for PDF output out of 106986 (max. 10000000)
+ 333 PDF objects out of 1000 (max. 8388607)
+ 237 compressed objects within 3 object streams
+ 65 named destinations out of 1000 (max. 500000)
+ 99344 words of extra memory for PDF output out of 106986 (max. 10000000)
 

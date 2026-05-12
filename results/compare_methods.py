@@ -5,7 +5,7 @@ Compare multiple training runs:
   - grpo_baseline_qwen2.5_1.5b.jsonl        (vanilla GRPO baseline)
   - gspo_baseline_qwen2.5_1.5b.jsonl        (GSPO sequence-ratio baseline)
   - sc_none_qwen2.5_1.5b.jsonl              (State-Corrected loss, no KL)
-  - sc_baseline_corrected_g8_qwen2.5_1.5b.jsonl
+  - sc_min_prefix_qwen2.5_1.5b.jsonl
   - sc_min_prefix_qwen2.5_1.5b.jsonl
   - sc_identity_qwen2.5_1.5b.jsonl
 
@@ -32,17 +32,38 @@ RESULTS_DIR = Path(__file__).resolve().parent
 RUNS = {
     "GRPO baseline": RESULTS_DIR / "grpo_baseline_qwen2.5_1.5b.jsonl",
     "GSPO baseline": RESULTS_DIR / "gspo_baseline_qwen2.5_1.5b.jsonl",
-    "SC (none)_clamp2": RESULTS_DIR / "sc_none_qwen2.5_1.5b_clamp2.jsonl",
-    "SC (none)_clamp4": RESULTS_DIR / "sc_none_qwen2.5_1.5b_clamp4.jsonl",
-    "SC (baseline_corrected, G=8)":
-        RESULTS_DIR / "sc_baseline_corrected_g8_qwen2.5_1.5b.jsonl",
-    "SC (min_prefix)":
+    "SC-mask (c=2)": RESULTS_DIR / "sc_none_qwen2.5_1.5b_clamp2.jsonl",
+    "SC-mask (c=4)": RESULTS_DIR / "sc_none_qwen2.5_1.5b_clamp4.jsonl",
+    "SC-mask (c=1e5)": RESULTS_DIR / "sc_none_qwen2.5_1.5b_clamp100000.jsonl",
+    "SC-min-prefix":
         RESULTS_DIR / "sc_min_prefix_qwen2.5_1.5b.jsonl",
-    "SC (identity)":
+    "SC-identity":
         RESULTS_DIR / "sc_identity_qwen2.5_1.5b.jsonl",
 }
 
 VAL_ACC_KEY = "val-core/DigitalLearningGmbH/MATH-lighteval/acc/mean@1"
+
+# Different runs may log the validation metric under slightly different dataset
+# names (e.g. "DigitalLearningGmbH/MATH-lighteval" vs "lighteval/MATH"), depending
+# on which mirror was used at preprocessing time. Anything matching the prefix +
+# suffix below is treated as the MATH val-acc.
+VAL_ACC_KEY_PREFIX = "val-core/"
+VAL_ACC_KEY_SUFFIX = "/acc/mean@1"
+
+
+def _find_val_acc(data: dict):
+    """Return the val-acc value if any matching key is present, else None."""
+    if VAL_ACC_KEY in data and data[VAL_ACC_KEY] is not None:
+        return data[VAL_ACC_KEY]
+    for k, v in data.items():
+        if (
+            isinstance(k, str)
+            and k.startswith(VAL_ACC_KEY_PREFIX)
+            and k.endswith(VAL_ACC_KEY_SUFFIX)
+            and v is not None
+        ):
+            return v
+    return None
 
 # Metrics we want to track from the "training" stream (keyed by global_step).
 TRAIN_METRICS = [
@@ -74,11 +95,12 @@ def load_run(path: Path):
 
             # Validation accuracy can appear either at step 0 or embedded in
             # training steps (every N steps) -- capture it in both cases.
-            if VAL_ACC_KEY in data:
+            val_v = _find_val_acc(data)
+            if val_v is not None:
                 gs = data.get("training/global_step", step if step == 0 else None)
                 if gs is None:
                     gs = step
-                val_points.append((gs, data[VAL_ACC_KEY]))
+                val_points.append((gs, val_v))
 
             # Training-side metrics are only meaningful when a global_step exists
             gs = data.get("training/global_step")
@@ -144,11 +166,11 @@ def main():
     colors = {
         "GRPO baseline":                  "#1f77b4",  # blue
         "GSPO baseline":                  "#17becf",  # cyan
-        "SC (none)_clamp2":               "#d62728",  # red
-        "SC (none)_clamp4":               "#e377c2",  # pink
-        "SC (baseline_corrected, G=8)":   "#2ca02c",  # green
-        "SC (min_prefix)":                "#ff7f0e",  # orange
-        "SC (identity)":                  "#9467bd",  # purple
+        "SC-mask (c=2)":               "#d62728",  # red
+        "SC-mask (c=4)":               "#e377c2",  # pink
+        "SC-mask (c=1e5)":             "#8b1a1a",  # dark red (effectively no clamp)
+        "SC-min-prefix":                "#ff7f0e",  # orange
+        "SC-identity":                  "#9467bd",  # purple
     }
 
     # Panel 0 : validation accuracy
@@ -182,7 +204,7 @@ def main():
             ax.legend()
 
     fig.suptitle(
-        "GRPO / GSPO baselines  vs.  SC (none / baseline_corrected / min_prefix / identity)   —   Qwen2.5-1.5B on MATH",
+        "GRPO / GSPO baselines  vs.  SC-mask / SC-min-prefix / SC-identity   —   Qwen2.5-1.5B on MATH",
         fontsize=13, fontweight="bold",
     )
     fig.tight_layout(rect=[0, 0, 1, 0.96])

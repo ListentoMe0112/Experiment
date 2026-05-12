@@ -28,7 +28,7 @@ NNODES=1
 
 # Training (8× H100 80GB) - Optimized for 1.5B model
 train_batch_size=1024
-ppo_mini_batch_size=256
+ppo_mini_batch_size=1024
 ppo_micro_batch_size_per_gpu=4
 max_prompt_length=1024
 max_response_length=2048
